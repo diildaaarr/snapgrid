@@ -8,7 +8,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors:{
-        origin:process.env.URL,
+        origin:"https://snapgrid-1.onrender.com",
         methods:['GET','POST']
     }
 })
