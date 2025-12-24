@@ -10,7 +10,7 @@ const useGetUserProfile = (userId) => {
     useEffect(() => {
         const fetchUserProfile = async () => {
             try {
-                const res = await axios.get(`https://snapgrid-h6s9.onrender.com/api/v1/user/${userId}/profile`, { withCredentials: true });
+                const res = await axios.get(`https://snapgrid-1.onrender.com/api/v1/user/${userId}/profile`, { withCredentials: true });
                 if (res.data.success) { 
                     dispatch(setUserProfile(res.data.user));
                 }

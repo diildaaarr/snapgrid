@@ -42,7 +42,7 @@ const EditProfile = () => {
         }
         try {
             setLoading(true);
-            const res = await axios.post('https://snapgrid-h6s9.onrender.com/api/v1/user/profile/edit', formData,{
+            const res = await axios.post('https://snapgrid-1.onrender.com/api/v1/user/profile/edit', formData,{
                 headers:{
                     'Content-Type':'multipart/form-data'
                 },

@@ -21,7 +21,7 @@
 
 //     const logoutHandler = async () => {
 //         try {
-//             const res = await axios.get('https://snapgrid-h6s9.onrender.com/api/v1/user/logout', { withCredentials: true });
+//             const res = await axios.get('https://snapgrid-1.onrender.com/api/v1/user/logout', { withCredentials: true });
 //             if (res.data.success) {
 //                 dispatch(setAuthUser(null));
 //                 dispatch(setSelectedPost(null));
@@ -144,7 +144,7 @@ const LeftSidebar = () => {
 
     const logoutHandler = async () => {
         try {
-            const res = await axios.get('https://snapgrid-h6s9.onrender.com/api/v1/user/logout', { withCredentials: true });
+            const res = await axios.get('https://snapgrid-1.onrender.com/api/v1/user/logout', { withCredentials: true });
             if (res.data.success) {
                 dispatch(setAuthUser(null));
                 dispatch(setSelectedPost(null));
