@@ -72,14 +72,14 @@ export const getUserPost = async (req, res) => {
             .sort({ createdAt: -1 })
             .populate({
                 path: 'author',
-                select: 'username profilePicture' // Fixed: removed comma
+                select: 'username profilePicture' 
             })
             .populate({
                 path: 'comments',
                 sort: { createdAt: -1 },
                 populate: {
                     path: 'author',
-                    select: 'username profilePicture' // Fixed: removed comma
+                    select: 'username profilePicture' 
                 }
             });
         return res.status(200).json({
