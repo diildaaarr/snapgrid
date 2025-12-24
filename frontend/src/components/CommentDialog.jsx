@@ -34,7 +34,7 @@ const CommentDialog = ({ open, setOpen }) => {
   const sendMessageHandler = async () => {
 
     try {
-      const res = await axios.post(`https://snapgrid-h6s9.onrender.com/api/v1/post/${selectedPost?._id}/comment`, { text }, {
+      const res = await axios.post(`http://localhost:8000/api/v1/post/${selectedPost?._id}/comment`, { text }, {
         headers: {
           'Content-Type': 'application/json'
         },
@@ -60,6 +60,7 @@ const CommentDialog = ({ open, setOpen }) => {
   return (
     <Dialog open={open}>
       <DialogContent onInteractOutside={() => setOpen(false)} className="max-w-5xl p-0 flex flex-col">
+        <DialogTitle>Comments</DialogTitle>
         <div className='flex flex-1'>
           <div className='w-1/2'>
             <img
@@ -88,6 +89,7 @@ const CommentDialog = ({ open, setOpen }) => {
                   <MoreHorizontal className='cursor-pointer' />
                 </DialogTrigger>
                 <DialogContent className="flex flex-col items-center text-sm text-center">
+                  <DialogTitle>Post Options</DialogTitle>
                   <div className='cursor-pointer w-full text-[#ED4956] font-bold'>
                     Unfollow
                   </div>

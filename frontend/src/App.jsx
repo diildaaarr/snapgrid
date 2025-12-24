@@ -55,13 +55,14 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      const socketio = io('https://snapgrid-h6s9.onrender.com', {
+      const socketio = io('http://localhost:5173', {
         query: {
           userId: user?._id
         },
         transports: ['websocket']
       });
-      dispatch(setSocket(socketio));
+      // DO NOT dispatch socket instance to redux as it's not serializable!
+      // dispatch(setSocket(socketio));
 
       // listen all the events
       socketio.on('getOnlineUsers', (onlineUsers) => {

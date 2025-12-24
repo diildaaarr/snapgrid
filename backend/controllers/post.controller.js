@@ -11,17 +11,27 @@ export const addNewPost = async (req, res) => {
         const image = req.file;
         const authorId = req.id;
 
-        if (!image) return res.status(400).json({ message: 'Image required' });
+        if (!image) {
+            console.log('Image upload failed: no image in req.file');
+            return res.status(400).json({ message: 'Image required', success: false });
+        }
 
-        // image upload 
-        const optimizedImageBuffer = await sharp(image.buffer)
-            .resize({ width: 800, height: 800, fit: 'inside' })
-            .toFormat('jpeg', { quality: 80 })
-            .toBuffer();
+        let cloudResponse;
+        try {
+            // image upload
+            const optimizedImageBuffer = await sharp(image.buffer)
+                .resize({ width: 800, height: 800, fit: 'inside' })
+                .toFormat('jpeg', { quality: 80 })
+                .toBuffer();
 
-        // buffer to data uri
-        const fileUri = `data:image/jpeg;base64,${optimizedImageBuffer.toString('base64')}`;
-        const cloudResponse = await cloudinary.uploader.upload(fileUri);
+            // buffer to data uri
+            const fileUri = `data:image/jpeg;base64,${optimizedImageBuffer.toString('base64')}`;
+            cloudResponse = await cloudinary.uploader.upload(fileUri);
+        } catch (imgErr) {
+            console.log('Image/cloudinary error:', imgErr);
+            return res.status(500).json({ message: 'Image upload failed', success: false });
+        }
+
         const post = await Post.create({
             caption,
             image: cloudResponse.secure_url,
@@ -42,7 +52,8 @@ export const addNewPost = async (req, res) => {
         })
 
     } catch (error) {
-        console.log(error);
+        console.error('Add new post error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 }
 export const getAllPost = async (req, res) => {
@@ -62,7 +73,8 @@ export const getAllPost = async (req, res) => {
             success: true
         })
     } catch (error) {
-        console.log(error);
+        console.error('Add new post error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 };
 export const getUserPost = async (req, res) => {
@@ -190,7 +202,8 @@ export const addComment = async (req,res) =>{
         })
 
     } catch (error) {
-        console.log(error);
+        console.error('Add new post error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 };
 export const getCommentsOfPost = async (req,res) => {
@@ -204,7 +217,8 @@ export const getCommentsOfPost = async (req,res) => {
         return res.status(200).json({success:true,comments});
 
     } catch (error) {
-        console.log(error);
+        console.error('Add new post error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 }
 export const deletePost = async (req,res) => {
@@ -235,7 +249,8 @@ export const deletePost = async (req,res) => {
         })
 
     } catch (error) {
-        console.log(error);
+        console.error('Add new post error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 }
 export const bookmarkPost = async (req,res) => {
@@ -260,6 +275,7 @@ export const bookmarkPost = async (req,res) => {
         }
 
     } catch (error) {
-        console.log(error);
+        console.error('Add new post error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 }

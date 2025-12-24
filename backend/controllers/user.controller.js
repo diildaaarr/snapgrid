@@ -161,13 +161,29 @@ export const getSuggestedUsers = async (req, res) => {
             users: suggestedUsers
         })
     } catch (error) {
-        console.log(error);
+        console.error('Follow/Unfollow error:', error);
+        res.status(500).json({ message: 'Internal server error', success: false });
     }
 };
 export const followOrUnfollow = async (req, res) => {
     try {
         const followKrneWala = req.id; // patel
         const jiskoFollowKrunga = req.params.id; // shivani
+
+        if (!followKrneWala) {
+            console.log('Error: followKrneWala (req.id) is undefined');
+            return res.status(401).json({
+                message: 'User not authenticated',
+                success: false
+            });
+        }
+        if (!jiskoFollowKrunga) {
+            console.log('Error: jiskoFollowKrunga (req.params.id) is undefined');
+            return res.status(400).json({
+                message: 'No user specified to follow/unfollow',
+                success: false
+            });
+        }
         if (followKrneWala === jiskoFollowKrunga) {
             return res.status(400).json({
                 message: 'You cannot follow/unfollow yourself',
@@ -179,6 +195,7 @@ export const followOrUnfollow = async (req, res) => {
         const targetUser = await User.findById(jiskoFollowKrunga);
 
         if (!user || !targetUser) {
+            console.log('Error: Either follower or target user not found');
             return res.status(400).json({
                 message: 'User not found',
                 success: false
