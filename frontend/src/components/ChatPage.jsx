@@ -17,7 +17,7 @@ const ChatPage = () => {
 
     const sendMessageHandler = async (receiverId) => {
         try {
-            const res = await axios.post(`https://snapgrid-1.onrender.com/api/v1/message/send/${receiverId}`, { textMessage }, {
+            const res = await axios.post(`https://snapgrid-r8kd.onrender.com/api/v1/message/send/${receiverId}`, { textMessage }, {
                 headers: {
                     'Content-Type': 'application/json'
                 },

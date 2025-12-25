@@ -55,7 +55,7 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      const socketio = io('http://localhost:5173', {
+      const socketio = io('https://snapgrid-r8kd.onrender.com', {
         query: {
           userId: user?._id
         },

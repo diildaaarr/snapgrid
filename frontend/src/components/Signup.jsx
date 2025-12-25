@@ -25,7 +25,7 @@ const Signup = () => {
         e.preventDefault();
         try {
             setLoading(true);
-            const res = await axios.post('https://snapgrid-1.onrender.com/api/v1/user/register', input, {
+            const res = await axios.post('https://snapgrid-r8kd.onrender.com/api/v1/user/register', input, {
                 headers: {
                     'Content-Type': 'application/json'
                 },

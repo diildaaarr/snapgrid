@@ -21,7 +21,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
 const corsOptions = {
-    origin: "https://snapgrid-1.onrender.com",
+    origin: "https://snapgrid-r8kd.onrender.com",
     credentials: true
 }
 app.use(cors(corsOptions));
