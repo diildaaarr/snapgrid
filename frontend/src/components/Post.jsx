@@ -53,14 +53,8 @@ const Post = ({ post }) => {
                 setPostLike(updatedLikes);
                 setLiked(!liked);
 
-                // apne post ko update krunga
-                const updatedPostData = posts.map(p =>
-                    p._id === post._id ? {
-                        ...p,
-                        likes: liked ? p.likes.filter(id => id !== user._id) : [...p.likes, user._id]
-                    } : p
-                );
-                dispatch(setPosts(updatedPostData));
+                // Don't dispatch setPosts to avoid changing the global order of posts
+                // The posts order should be maintained as received from the backend
                 toast.success(res.data.message);
             }
         } catch (error) {
@@ -82,11 +76,8 @@ const Post = ({ post }) => {
                 const updatedCommentData = [...comment, res.data.comment];
                 setComment(updatedCommentData);
 
-                const updatedPostData = posts.map(p =>
-                    p._id === post._id ? { ...p, comments: updatedCommentData } : p
-                );
-
-                dispatch(setPosts(updatedPostData));
+                // Don't dispatch setPosts to avoid changing the global order of posts
+                // The posts order should be maintained as received from the backend
                 // Removed toast success message as requested
                 setText("");
             }
@@ -131,6 +122,7 @@ const Post = ({ post }) => {
                     dispatch(setAuthUser(updatedUser));
                 }
                 
+                // Don't dispatch setPosts to avoid changing the global order of posts
                 toast.success(res.data.message);
             }
         } catch (error) {
@@ -142,13 +134,15 @@ const Post = ({ post }) => {
         <div className='w-full border border-gray-200 rounded-xl p-3 sm:p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200'>
             <div className='flex items-center justify-between mb-3'>
                 <div className='flex items-center gap-2'>
-                    <Avatar className='border border-gray-200 w-8 h-8 sm:w-10 sm:h-10'>
-                        <AvatarImage src={post.author?.profilePicture} alt="post_image" />
-                        <AvatarFallback>CN</AvatarFallback>
-                    </Avatar>
+                    <Link to={`/profile/${post.author?._id}`} className='flex-shrink-0'>
+                        <Avatar className='border border-gray-200 w-8 h-8 sm:w-10 sm:h-10 cursor-pointer'>
+                            <AvatarImage src={post.author?.profilePicture} alt="post_image" />
+                            <AvatarFallback>CN</AvatarFallback>
+                        </Avatar>
+                    </Link>
                     <div className='flex items-center gap-2 sm:gap-3'>
-                        <h1 className='font-semibold text-sm sm:text-base'>{post.author?.username}</h1>
-                       {user?._id === post.author._id &&  <Badge variant="secondary" className='text-xs hidden sm:inline-flex'>Author</Badge>}
+                        <Link to={`/profile/${post.author?._id}`} className='font-semibold text-sm sm:text-base hover:underline cursor-pointer'>{post.author?.username}</Link>
+                       {user?._id === post.author._id &&  <Badge variant="secondary" className='text-xs'>Author</Badge>}
                     </div>
                 </div>
                 <Dialog>

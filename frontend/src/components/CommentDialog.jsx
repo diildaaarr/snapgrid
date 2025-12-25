@@ -62,11 +62,9 @@ const CommentDialog = ({ open, setOpen }) => {
         const updatedCommentData = [...comment, res.data.comment];
         setComment(updatedCommentData);
 
-        const updatedPostData = posts.map(p =>
-          p._id === selectedPost._id ? { ...p, comments: updatedCommentData } : p
-        );
-        dispatch(setPosts(updatedPostData));
-        toast.success(res.data.message);
+        // Don't dispatch setPosts to avoid changing the global order of posts
+        // The posts order should be maintained as received from the backend
+        // Removed toast success message as requested
         setText("");
       }
     } catch (error) {
