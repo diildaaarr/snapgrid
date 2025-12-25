@@ -111,11 +111,11 @@ const CommentDialog = ({ open, setOpen }) => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent onInteractOutside={() => setOpen(false)} className="max-w-6xl h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent onInteractOutside={() => setOpen(false)} className="max-w-[95vw] md:max-w-6xl h-[85vh] md:h-[90vh] p-0 flex flex-col overflow-hidden">
         <DialogTitle className="sr-only">Comments</DialogTitle>
-        <div className='flex flex-1 min-h-0'>
+        <div className='flex flex-1 min-h-0 flex-col md:flex-row'>
           {/* Image Section */}
-          <div className='w-1/2 hidden md:block bg-black'>
+          <div className='w-full h-48 md:w-1/2 md:h-auto hidden md:block bg-black'>
             <img
               src={selectedPost?.image}
               alt="post_img"
@@ -124,28 +124,28 @@ const CommentDialog = ({ open, setOpen }) => {
           </div>
           
           {/* Comments Section */}
-          <div className='w-full md:w-1/2 flex flex-col bg-white'>
+          <div className='w-full md:w-1/2 flex flex-col bg-white flex-1 min-h-0'>
             {/* Header */}
-            <div className='flex items-center justify-between p-4 border-b border-gray-200'>
-              <div className='flex gap-3 items-center'>
+            <div className='flex items-center justify-between p-3 sm:p-4 border-b border-gray-200'>
+              <div className='flex gap-2 sm:gap-3 items-center flex-1 min-w-0'>
                 <Link to={`/profile/${selectedPost?.author?._id}`} onClick={() => setOpen(false)}>
-                  <Avatar className='w-10 h-10 border-2 border-gray-100'>
+                  <Avatar className='w-8 h-8 sm:w-10 sm:h-10 border-2 border-gray-100'>
                     <AvatarImage src={selectedPost?.author?.profilePicture} />
-                    <AvatarFallback className='text-sm'>
+                    <AvatarFallback className='text-xs sm:text-sm'>
                       {selectedPost?.author?.username?.charAt(0)?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Link>
-                <div>
+                <div className='min-w-0'>
                   <Link 
                     to={`/profile/${selectedPost?.author?._id}`}
                     onClick={() => setOpen(false)}
-                    className='font-semibold text-sm hover:underline block'
+                    className='font-semibold text-xs sm:text-sm hover:underline block truncate'
                   >
                     {selectedPost?.author?.username}
                   </Link>
                   {selectedPost?.caption && (
-                    <p className='text-sm text-gray-600 mt-1 line-clamp-2'>{selectedPost.caption}</p>
+                    <p className='text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2'>{selectedPost.caption}</p>
                   )}
                 </div>
               </div>
@@ -251,19 +251,19 @@ const CommentDialog = ({ open, setOpen }) => {
             </div>
 
             {/* Actions Bar */}
-            <div className='flex items-center gap-4 px-4 py-3 border-b border-gray-200'>
+            <div className='flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200'>
               <button
                 onClick={likeOrDislikeHandler}
                 className={`transition-colors ${liked ? 'text-red-600' : 'text-gray-600 hover:text-red-600'}`}
               >
-                <Heart className={`w-6 h-6 ${liked ? 'fill-current' : ''}`} />
+                <Heart className={`w-5 h-5 sm:w-6 sm:h-6 ${liked ? 'fill-current' : ''}`} />
               </button>
-              <MessageCircle className='w-6 h-6 text-gray-600' />
-              <span className='font-semibold text-sm text-gray-800'>{likeCount} likes</span>
+              <MessageCircle className='w-5 h-5 sm:w-6 sm:h-6 text-gray-600' />
+              <span className='font-semibold text-xs sm:text-sm text-gray-800'>{likeCount} likes</span>
             </div>
 
             {/* Comments List */}
-            <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+            <div className='flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4'>
               {comment.length > 0 ? (
                 <>
                   {comment.map((commentItem) => (
@@ -272,28 +272,28 @@ const CommentDialog = ({ open, setOpen }) => {
                   <div ref={commentsEndRef} />
                 </>
               ) : (
-                <div className='flex flex-col items-center justify-center h-full text-center py-12'>
-                  <MessageCircle className='w-16 h-16 text-gray-300 mb-4' />
-                  <p className="text-gray-500 font-medium mb-1">No comments yet</p>
-                  <p className="text-gray-400 text-sm">Be the first to comment!</p>
+                <div className='flex flex-col items-center justify-center h-full text-center py-8 sm:py-12'>
+                  <MessageCircle className='w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mb-3 sm:mb-4' />
+                  <p className="text-gray-500 font-medium text-sm mb-1">No comments yet</p>
+                  <p className="text-gray-400 text-xs">Be the first to comment!</p>
                 </div>
               )}
             </div>
 
             {/* Comment Input */}
-            <div className='p-4 border-t border-gray-200 bg-gray-50'>
+            <div className='p-3 sm:p-4 border-t border-gray-200 bg-gray-50'>
               <div className='flex items-center gap-2'>
-                <Avatar className='w-8 h-8 flex-shrink-0'>
+                <Avatar className='w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0'>
                   <AvatarImage src={user?.profilePicture} />
                   <AvatarFallback className='text-xs'>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
-                <div className='flex-1 flex items-center gap-2 bg-white border border-gray-300 rounded-full px-4 py-2'>
+                <div className='flex-1 flex items-center gap-2 bg-white border border-gray-300 rounded-full px-3 sm:px-4 py-1.5 sm:py-2'>
                   <Input 
                     type="text" 
                     value={text} 
                     onChange={changeEventHandler} 
                     placeholder='Add a comment...' 
-                    className='flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm p-0 h-auto' 
+                    className='flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-xs sm:text-sm p-0 h-auto' 
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && text.trim() && !e.shiftKey) {
                         e.preventDefault();
@@ -305,9 +305,9 @@ const CommentDialog = ({ open, setOpen }) => {
                     disabled={!text.trim()} 
                     onClick={sendMessageHandler}
                     size="sm"
-                    className='rounded-full bg-[#0095F6] hover:bg-[#3192d2] disabled:opacity-50 disabled:cursor-not-allowed h-8 px-4'
+                    className='rounded-full bg-[#0095F6] hover:bg-[#3192d2] disabled:opacity-50 disabled:cursor-not-allowed h-7 sm:h-8 px-3 sm:px-4'
                   >
-                    <Send className='w-4 h-4' />
+                    <Send className='w-3 h-3 sm:w-4 sm:h-4' />
                   </Button>
                 </div>
               </div>

@@ -78,44 +78,44 @@ const EditProfile = () => {
         }
     }
     return (
-        <div className='flex max-w-3xl mx-auto pl-10'>
-            <section className='flex flex-col gap-8 w-full my-8 p-6'>
-                <div className='border-b border-gray-200 pb-4'>
-                    <h1 className='font-bold text-2xl'>Edit Profile</h1>
-                    <p className='text-gray-500 text-sm mt-1'>Update your profile information</p>
+        <div className='flex max-w-3xl mx-auto px-3 sm:px-6 lg:pl-10'>
+            <section className='flex flex-col gap-6 sm:gap-8 w-full my-4 sm:my-8 p-4 sm:p-6'>
+                <div className='border-b border-gray-200 pb-3 sm:pb-4'>
+                    <h1 className='font-bold text-xl sm:text-2xl'>Edit Profile</h1>
+                    <p className='text-gray-500 text-xs sm:text-sm mt-1'>Update your profile information</p>
                 </div>
 
                 {/* Profile Photo Section */}
-                <div className='flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 bg-gray-50 rounded-xl border border-gray-200'>
+                <div className='flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200'>
                     <div className='relative flex-shrink-0'>
-                        <Avatar className='h-24 w-24 border-4 border-white shadow-lg'>
+                        <Avatar className='h-20 w-20 sm:h-24 sm:w-24 border-4 border-white shadow-lg'>
                             <AvatarImage src={input.profilePhotoPreview || user?.profilePicture} alt="profile" />
-                            <AvatarFallback className='text-lg'>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                            <AvatarFallback className='text-base sm:text-lg'>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
-                        <div className='absolute bottom-0 right-0 bg-[#0095F6] rounded-full p-2 shadow-md cursor-pointer hover:bg-[#3192d2] transition-colors' onClick={() => imageRef?.current.click()}>
-                            <Camera className='w-4 h-4 text-white' />
+                        <div className='absolute bottom-0 right-0 bg-[#0095F6] rounded-full p-1.5 sm:p-2 shadow-md cursor-pointer hover:bg-[#3192d2] transition-colors' onClick={() => imageRef?.current.click()}>
+                            <Camera className='w-3 h-3 sm:w-4 sm:h-4 text-white' />
                         </div>
                     </div>
-                    <div className='flex-1'>
-                        <h2 className='font-semibold text-lg mb-1'>{user?.username}</h2>
-                        <p className='text-gray-600 text-sm mb-4'>{input.bio || 'No bio yet'}</p>
+                    <div className='flex-1 text-center sm:text-left'>
+                        <h2 className='font-semibold text-base sm:text-lg mb-1'>{user?.username}</h2>
+                        <p className='text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4'>{input.bio || 'No bio yet'}</p>
                         <input ref={imageRef} onChange={fileChangeHandler} type='file' accept='image/*' className='hidden' />
                         <Button 
                             onClick={() => imageRef?.current.click()} 
                             variant='outline' 
-                            className='border-gray-300 hover:bg-gray-100'
+                            className='border-gray-300 hover:bg-gray-100 text-sm'
                         >
-                            <Camera className='w-4 h-4 mr-2' />
-                            Change Profile Photo
+                            <Camera className='w-3 h-3 sm:w-4 sm:h-4 mr-2' />
+                            Change Photo
                         </Button>
-                        <p className='text-xs text-gray-500 mt-2'>JPG, PNG or GIF. Max size of 5MB</p>
+                        <p className='text-xs text-gray-500 mt-2 hidden sm:block'>JPG, PNG or GIF. Max size of 5MB</p>
                     </div>
                 </div>
 
                 {/* Bio Section */}
-                <div className='space-y-3'>
-                    <Label htmlFor='bio' className='text-base font-semibold flex items-center gap-2'>
-                        <FileText className='w-4 h-4' />
+                <div className='space-y-2 sm:space-y-3'>
+                    <Label htmlFor='bio' className='text-sm sm:text-base font-semibold flex items-center gap-2'>
+                        <FileText className='w-3 h-3 sm:w-4 sm:h-4' />
                         Bio
                     </Label>
                     <Textarea 
@@ -123,7 +123,7 @@ const EditProfile = () => {
                         value={input.bio} 
                         onChange={(e) => setInput({ ...input, bio: e.target.value })} 
                         name='bio' 
-                        className="focus-visible:ring-transparent min-h-[100px] resize-none" 
+                        className="focus-visible:ring-transparent min-h-[80px] sm:min-h-[100px] resize-none text-sm" 
                         placeholder="Tell us about yourself..."
                         maxLength={150}
                     />
@@ -131,13 +131,13 @@ const EditProfile = () => {
                 </div>
 
                 {/* Gender Section */}
-                <div className='space-y-3'>
-                    <Label htmlFor='gender' className='text-base font-semibold flex items-center gap-2'>
-                        <User className='w-4 h-4' />
+                <div className='space-y-2 sm:space-y-3'>
+                    <Label htmlFor='gender' className='text-sm sm:text-base font-semibold flex items-center gap-2'>
+                        <User className='w-3 h-3 sm:w-4 sm:h-4' />
                         Gender
                     </Label>
                     <Select value={input.gender} onValueChange={selectChangeHandler}>
-                        <SelectTrigger id='gender' className="w-full h-11">
+                        <SelectTrigger id='gender' className="w-full h-10 sm:h-11 text-sm">
                             <SelectValue placeholder="Select your gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -150,24 +150,24 @@ const EditProfile = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className='flex justify-end gap-3 pt-4 border-t border-gray-200'>
+                <div className='flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200'>
                     <Button 
                         variant='outline' 
                         onClick={() => navigate(`/profile/${user?._id}`)}
-                        className='px-6'
+                        className='px-6 text-sm'
                     >
                         Cancel
                     </Button>
                     {
                         loading ? (
-                            <Button className='px-6 bg-[#0095F6] hover:bg-[#3192d2]'>
+                            <Button className='px-6 bg-[#0095F6] hover:bg-[#3192d2] text-sm'>
                                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                                 Saving...
                             </Button>
                         ) : (
                             <Button 
                                 onClick={editProfileHandler} 
-                                className='px-6 bg-[#0095F6] hover:bg-[#3192d2] shadow-sm'
+                                className='px-6 bg-[#0095F6] hover:bg-[#3192d2] shadow-sm text-sm'
                             >
                                 Save Changes
                             </Button>

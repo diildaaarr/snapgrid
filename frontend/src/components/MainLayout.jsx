@@ -6,7 +6,8 @@ const MainLayout = () => {
   return (
     <div className='min-h-screen bg-gray-50'>
       <LeftSidebar/>
-      <div className='ml-[16%]'>
+      {/* Add padding bottom for mobile bottom nav, left margin for larger screens */}
+      <div className='pb-16 md:pb-0 md:ml-[70px] lg:ml-[16%]'>
         <Outlet/>
       </div>
     </div>

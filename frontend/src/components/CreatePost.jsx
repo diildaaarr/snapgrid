@@ -105,34 +105,34 @@ const CreatePost = ({ open, setOpen }) => {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent onInteractOutside={handleClose}>
-        <DialogHeader className='text-center font-semibold'>
+      <DialogContent onInteractOutside={handleClose} className='max-w-[95vw] sm:max-w-lg'>
+        <DialogHeader className='text-center font-semibold text-base sm:text-lg'>
           Create New Post
         </DialogHeader>
-        <div className='flex gap-3 items-center'>
-          <Avatar>
+        <div className='flex gap-2 sm:gap-3 items-center'>
+          <Avatar className='w-8 h-8 sm:w-10 sm:h-10'>
             <AvatarImage src={user?.profilePicture} alt="img" />
             <AvatarFallback>CN</AvatarFallback>
           </Avatar>
           <div>
-            <h1 className='font-semibold text-xs'>{user?.username}</h1>
-            <span className='text-gray-600 text-xs'>{user?.bio || "Bio here..."}</span>
+            <h1 className='font-semibold text-xs sm:text-sm'>{user?.username}</h1>
+            <span className='text-gray-600 text-xs line-clamp-1'>{user?.bio || "Bio here..."}</span>
           </div>
         </div>
         <Textarea 
           value={caption} 
           onChange={(e) => setCaption(e.target.value)} 
-          className="focus-visible:ring-transparent border-none min-h-[100px]" 
+          className="focus-visible:ring-transparent border-none min-h-[80px] sm:min-h-[100px] text-sm" 
           placeholder="Write a caption..." 
           required
         />
         {
           imagePreview && (
-            <div className='w-full h-64 flex items-center justify-center'>
+            <div className='w-full h-48 sm:h-64 flex items-center justify-center'>
               <img 
                 src={imagePreview} 
                 alt="preview_img" 
-                className='object-cover h-full w-full rounded-md' 
+                className='object-contain h-full w-full rounded-md' 
               />
             </div>
           )
@@ -146,14 +146,14 @@ const CreatePost = ({ open, setOpen }) => {
         />
         <Button 
           onClick={() => imageRef.current.click()} 
-          className='w-fit mx-auto bg-[#0095F6] hover:bg-[#258bcf]'
+          className='w-fit mx-auto bg-[#0095F6] hover:bg-[#258bcf] text-sm'
         >
           {imagePreview ? "Change Image" : "Select from computer"}
         </Button>
         {
           imagePreview && (
             loading ? (
-              <Button disabled>
+              <Button disabled className='text-sm'>
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                 Please wait
               </Button>
@@ -161,7 +161,7 @@ const CreatePost = ({ open, setOpen }) => {
               <Button 
                 onClick={createPostHandler} 
                 type="submit" 
-                className="w-full bg-[#0095F6] hover:bg-[#258bcf]"
+                className="w-full bg-[#0095F6] hover:bg-[#258bcf] text-sm"
               >
                 Post
               </Button>

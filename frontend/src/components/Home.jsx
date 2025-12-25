@@ -10,11 +10,11 @@ const Home = () => {
     useGetSuggestedUsers();
     return (
         <div className='flex min-h-screen bg-gray-50'>
-            <div className='flex-grow max-w-4xl mx-auto'>
+            <div className='flex-grow w-full lg:max-w-4xl mx-auto'>
                 <Feed />
                 <Outlet />
             </div>
-            <div className='hidden lg:block'>
+            <div className='hidden xl:block'>
                 <RightSidebar />
             </div>
         </div>

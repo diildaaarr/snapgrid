@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from './ui/dialog'
-import { Bookmark, MessageCircle, MoreHorizontal, Send } from 'lucide-react'
+import { Bookmark, MessageCircle, MoreHorizontal, Send, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import CommentDialog from './CommentDialog'
@@ -16,6 +16,7 @@ import { Badge } from './ui/badge'
 const Post = ({ post }) => {
     const [text, setText] = useState("");
     const [open, setOpen] = useState(false);
+    const [imageOpen, setImageOpen] = useState(false);
     const { user } = useSelector(store => store.auth);
     const { posts } = useSelector(store => store.post);
     const [liked, setLiked] = useState(post.likes.includes(user?._id) || false);
@@ -138,16 +139,16 @@ const Post = ({ post }) => {
         }
     }
     return (
-        <div className='w-full border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200'>
+        <div className='w-full border border-gray-200 rounded-xl p-3 sm:p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200'>
             <div className='flex items-center justify-between mb-3'>
                 <div className='flex items-center gap-2'>
-                    <Avatar className='border border-gray-200'>
+                    <Avatar className='border border-gray-200 w-8 h-8 sm:w-10 sm:h-10'>
                         <AvatarImage src={post.author?.profilePicture} alt="post_image" />
                         <AvatarFallback>CN</AvatarFallback>
                     </Avatar>
-                    <div className='flex items-center gap-3'>
-                        <h1 className='font-semibold'>{post.author?.username}</h1>
-                       {user?._id === post.author._id &&  <Badge variant="secondary" className='text-xs'>Author</Badge>}
+                    <div className='flex items-center gap-2 sm:gap-3'>
+                        <h1 className='font-semibold text-sm sm:text-base'>{post.author?.username}</h1>
+                       {user?._id === post.author._id &&  <Badge variant="secondary" className='text-xs hidden sm:inline-flex'>Author</Badge>}
                     </div>
                 </div>
                 <Dialog>
@@ -222,14 +223,38 @@ const Post = ({ post }) => {
                     </DialogContent>
                 </Dialog>
             </div>
-            <img
-                className='rounded-lg my-2 w-full aspect-square object-cover shadow-sm'
-                src={post.image}
-                alt="post_img"
-            />
+            {/* Image with click to view full size */}
+            <div className='relative my-2'>
+                <img
+                    className='rounded-lg w-full max-h-[500px] object-contain bg-gray-100 cursor-pointer shadow-sm'
+                    src={post.image}
+                    alt="post_img"
+                    onClick={() => setImageOpen(true)}
+                />
+            </div>
+
+            {/* Image Lightbox Dialog */}
+            <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+                <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-[85vw] max-h-[95vh] p-0 bg-transparent border-none overflow-hidden">
+                    <DialogTitle className="sr-only">View Image</DialogTitle>
+                    <div className='relative flex items-center justify-center w-full h-full'>
+                        <button 
+                            onClick={() => setImageOpen(false)}
+                            className='absolute top-2 right-2 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors'
+                        >
+                            <X className='w-6 h-6' />
+                        </button>
+                        <img
+                            src={post.image}
+                            alt="post_img_full"
+                            className='max-w-full max-h-[90vh] object-contain rounded-lg'
+                        />
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <div className='flex items-center justify-between my-2'>
-                <div className='flex items-center gap-3'>
+                <div className='flex items-center gap-2 sm:gap-3'>
                     {
                         liked ? <FaHeart onClick={likeOrDislikeHandler} size={'24'} className='cursor-pointer text-red-600' /> : <FaRegHeart onClick={likeOrDislikeHandler} size={'22px'} className='cursor-pointer hover:text-gray-600' />
                     }
@@ -249,8 +274,8 @@ const Post = ({ post }) => {
                     }`}
                 />
             </div>
-            <span className='font-medium block mb-2'>{postLike} likes</span>
-            <p>
+            <span className='font-medium block mb-2 text-sm sm:text-base'>{postLike} likes</span>
+            <p className='text-sm sm:text-base'>
                 <span className='font-medium mr-2'>{post.author?.username}</span>
                 {post.caption}
             </p>
