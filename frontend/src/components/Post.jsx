@@ -87,7 +87,7 @@ const Post = ({ post }) => {
                 );
 
                 dispatch(setPosts(updatedPostData));
-                toast.success(res.data.message);
+                // Removed toast success message as requested
                 setText("");
             }
         } catch (error) {
@@ -155,7 +155,7 @@ const Post = ({ post }) => {
                     <DialogTrigger asChild>
                         <MoreHorizontal className='cursor-pointer hover:text-gray-600 transition-colors' />
                     </DialogTrigger>
-                    <DialogContent className="flex flex-col items-center text-sm text-center gap-2 p-4">
+                    <DialogContent className="flex flex-col items-center text-sm text-center gap-2 p-4 max-w-[90vw] sm:max-w-md">
                         <DialogTitle className="sr-only">Post Options</DialogTitle>
                         {
                         post?.author?._id !== user?._id && (

@@ -78,6 +78,7 @@ const CreatePost = ({ open, setOpen }) => {
       console.log("Backend response:", res.data);
       
       if (res.data.success) {
+        // Add the new post at the beginning of the posts array to show it at the top
         dispatch(setPosts([res.data.post, ...posts]));
         toast.success(res.data.message);
         setOpen(false);
