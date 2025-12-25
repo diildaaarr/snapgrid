@@ -95,17 +95,19 @@ const CreatePost = ({ open, setOpen }) => {
     }
   }
 
-  const handleClose = () => {
-    setOpen(false);
-    // Reset form when closing
-    setCaption("");
-    setFile("");
-    setImagePreview("");
+  const handleClose = (isOpen) => {
+    if (!isOpen) {
+      setOpen(false);
+      // Reset form when closing
+      setCaption("");
+      setFile("");
+      setImagePreview("");
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent onInteractOutside={handleClose} className='max-w-[95vw] sm:max-w-lg'>
+      <DialogContent className='max-w-[95vw] sm:max-w-lg'>
         <DialogHeader className='text-center font-semibold text-base sm:text-lg'>
           Create New Post
         </DialogHeader>

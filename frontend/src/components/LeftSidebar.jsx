@@ -280,8 +280,6 @@ const LeftSidebar = () => {
                         }
                     </div>
                 </div>
-
-                <CreatePost open={open} setOpen={setOpen} />
             </div>
 
             {/* Mobile Bottom Navigation */}
@@ -302,8 +300,10 @@ const LeftSidebar = () => {
                         })
                     }
                 </div>
-                <CreatePost open={open} setOpen={setOpen} />
             </div>
+
+            {/* CreatePost Dialog - Outside containers so it works on all screen sizes */}
+            <CreatePost open={open} setOpen={setOpen} />
         </>
     )
 }
