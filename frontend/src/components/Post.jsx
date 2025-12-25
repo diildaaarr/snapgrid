@@ -1,14 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import { Dialog, DialogContent, DialogTrigger } from './ui/dialog'
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from './ui/dialog'
 import { Bookmark, MessageCircle, MoreHorizontal, Send } from 'lucide-react'
 import { Button } from './ui/button'
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import CommentDialog from './CommentDialog'
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'sonner'
 import { setPosts, setSelectedPost } from '@/redux/postSlice'
+import { setAuthUser, setSelectedUser } from '@/redux/authSlice'
 import { Badge } from './ui/badge'
 
 const Post = ({ post }) => {
@@ -19,7 +21,17 @@ const Post = ({ post }) => {
     const [liked, setLiked] = useState(post.likes.includes(user?._id) || false);
     const [postLike, setPostLike] = useState(post.likes.length);
     const [comment, setComment] = useState(post.comments);
+    const [isBookmarked, setIsBookmarked] = useState(false);
     const dispatch = useDispatch();
+    const navigate = useNavigate();
+
+    // Check if post is bookmarked
+    useEffect(() => {
+        if (user?.bookmarks) {
+            const bookmarked = user.bookmarks.some(bookmarkId => bookmarkId.toString() === post._id.toString());
+            setIsBookmarked(bookmarked);
+        }
+    }, [user?.bookmarks, post._id]);
 
     const changeEventHandler = (e) => {
         const inputText = e.target.value;
@@ -100,43 +112,118 @@ const Post = ({ post }) => {
         try {
             const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/post/${post?._id}/bookmark`, {withCredentials:true});
             if(res.data.success){
+                // Update bookmark state
+                setIsBookmarked(res.data.type === 'saved');
+                
+                // Update user's bookmarks in Redux
+                if (user) {
+                    const updatedUser = { ...user };
+                    if (res.data.type === 'saved') {
+                        // Add to bookmarks
+                        updatedUser.bookmarks = [...(updatedUser.bookmarks || []), post._id];
+                    } else {
+                        // Remove from bookmarks
+                        updatedUser.bookmarks = (updatedUser.bookmarks || []).filter(
+                            bookmarkId => bookmarkId.toString() !== post._id.toString()
+                        );
+                    }
+                    dispatch(setAuthUser(updatedUser));
+                }
+                
                 toast.success(res.data.message);
             }
         } catch (error) {
             console.log(error);
+            toast.error('Failed to update bookmark');
         }
     }
     return (
-        <div className='my-8 w-full max-w-sm mx-auto'>
-            <div className='flex items-center justify-between'>
+        <div className='w-full border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200'>
+            <div className='flex items-center justify-between mb-3'>
                 <div className='flex items-center gap-2'>
-                    <Avatar>
+                    <Avatar className='border border-gray-200'>
                         <AvatarImage src={post.author?.profilePicture} alt="post_image" />
                         <AvatarFallback>CN</AvatarFallback>
                     </Avatar>
                     <div className='flex items-center gap-3'>
-                        <h1>{post.author?.username}</h1>
-                       {user?._id === post.author._id &&  <Badge variant="secondary">Author</Badge>}
+                        <h1 className='font-semibold'>{post.author?.username}</h1>
+                       {user?._id === post.author._id &&  <Badge variant="secondary" className='text-xs'>Author</Badge>}
                     </div>
                 </div>
                 <Dialog>
                     <DialogTrigger asChild>
-                        <MoreHorizontal className='cursor-pointer' />
+                        <MoreHorizontal className='cursor-pointer hover:text-gray-600 transition-colors' />
                     </DialogTrigger>
-                    <DialogContent className="flex flex-col items-center text-sm text-center">
+                    <DialogContent className="flex flex-col items-center text-sm text-center gap-2 p-4">
+                        <DialogTitle className="sr-only">Post Options</DialogTitle>
                         {
-                        post?.author?._id !== user?._id && <Button variant='ghost' className="cursor-pointer w-fit text-[#ED4956] font-bold">Unfollow</Button>
+                        post?.author?._id !== user?._id && (
+                            <>
+                                <Button 
+                                    variant='ghost' 
+                                    className={`cursor-pointer w-full font-semibold hover:bg-gray-100 ${
+                                        user?.following?.some(id => id.toString() === post.author._id.toString()) 
+                                            ? 'text-[#ED4956]' 
+                                            : 'text-[#0095F6]'
+                                    }`}
+                                    onClick={async () => {
+                                        try {
+                                            const res = await axios.post(`https://snapgrid-r8kd.onrender.com/api/v1/user/followorunfollow/${post.author._id}`, {}, { withCredentials: true });
+                                            if (res.data.success) {
+                                                if (user) {
+                                                    const updatedUser = { ...user };
+                                                    if (res.data.action === 'unfollow') {
+                                                        updatedUser.following = (updatedUser.following || []).filter(id => id.toString() !== post.author._id.toString());
+                                                    } else {
+                                                        updatedUser.following = [...(updatedUser.following || []), post.author._id];
+                                                    }
+                                                    dispatch(setAuthUser(updatedUser));
+                                                }
+                                                toast.success(res.data.message);
+                                            }
+                                        } catch (error) {
+                                            console.error('Follow/Unfollow error:', error);
+                                            toast.error('Failed to update follow status');
+                                        }
+                                    }}
+                                >
+                                    {user?.following?.some(id => id.toString() === post.author._id.toString()) ? 'Unfollow' : 'Follow'}
+                                </Button>
+                                <Button 
+                                    variant='ghost' 
+                                    className="cursor-pointer w-full font-semibold hover:bg-gray-100"
+                                    onClick={bookmarkHandler}
+                                >
+                                    {isBookmarked ? 'Remove from Bookmarks' : 'Save to Bookmarks'}
+                                </Button>
+                            </>
+                        )
                         }
-                        
-                        <Button variant='ghost' className="cursor-pointer w-fit">Add to favorites</Button>
                         {
-                            user && user?._id === post?.author._id && <Button onClick={deletePostHandler} variant='ghost' className="cursor-pointer w-fit">Delete</Button>
+                            user && user?._id === post?.author._id && (
+                                <>
+                                    <Button 
+                                        variant='ghost' 
+                                        className="cursor-pointer w-full font-semibold hover:bg-gray-100"
+                                        onClick={bookmarkHandler}
+                                    >
+                                        {isBookmarked ? 'Remove from Bookmarks' : 'Save to Bookmarks'}
+                                    </Button>
+                                    <Button 
+                                        onClick={deletePostHandler} 
+                                        variant='ghost' 
+                                        className="cursor-pointer w-full text-[#ED4956] font-bold hover:bg-red-50"
+                                    >
+                                        Delete
+                                    </Button>
+                                </>
+                            )
                         }
                     </DialogContent>
                 </Dialog>
             </div>
             <img
-                className='rounded-sm my-2 w-full aspect-square object-cover'
+                className='rounded-lg my-2 w-full aspect-square object-cover shadow-sm'
                 src={post.image}
                 alt="post_img"
             />
@@ -153,7 +240,14 @@ const Post = ({ post }) => {
                     }} className='cursor-pointer hover:text-gray-600' />
                     <Send className='cursor-pointer hover:text-gray-600' />
                 </div>
-                <Bookmark onClick={bookmarkHandler} className='cursor-pointer hover:text-gray-600' />
+                <Bookmark 
+                    onClick={bookmarkHandler} 
+                    className={`cursor-pointer transition-colors ${
+                        isBookmarked 
+                            ? 'fill-black text-black' 
+                            : 'hover:text-gray-600'
+                    }`}
+                />
             </div>
             <span className='font-medium block mb-2'>{postLike} likes</span>
             <p>

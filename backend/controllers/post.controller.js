@@ -11,13 +11,27 @@ export const addNewPost = async (req, res) => {
         const image = req.file;
         const authorId = req.id;
 
+        console.log("Add new post request received");
+        console.log("Caption:", caption);
+        console.log("Author ID:", authorId);
+        console.log("Image present:", !!image);
+
         if (!image) {
             console.log('Image upload failed: no image in req.file');
             return res.status(400).json({ message: 'Image required', success: false });
         }
 
+        if (!caption) {
+            return res.status(400).json({ 
+                message: 'Caption is required', 
+                success: false 
+            });
+        }
+
         let cloudResponse;
         try {
+            console.log("Processing image with Sharp...");
+            
             // image upload
             const optimizedImageBuffer = await sharp(image.buffer)
                 .resize({ width: 800, height: 800, fit: 'inside' })
@@ -26,10 +40,23 @@ export const addNewPost = async (req, res) => {
 
             // buffer to data uri
             const fileUri = `data:image/jpeg;base64,${optimizedImageBuffer.toString('base64')}`;
-            cloudResponse = await cloudinary.uploader.upload(fileUri);
+            console.log("Uploading to Cloudinary...");
+            
+            // Test Cloudinary configuration first
+            console.log("Cloudinary config check - Cloud name:", process.env.CLOUD_NAME);
+            
+            cloudResponse = await cloudinary.uploader.upload(fileUri, {
+                folder: "social-media-posts"
+            });
+            
+            console.log("Cloudinary upload successful:", cloudResponse.secure_url);
         } catch (imgErr) {
             console.log('Image/cloudinary error:', imgErr);
-            return res.status(500).json({ message: 'Image upload failed', success: false });
+            return res.status(500).json({ 
+                message: 'Image upload failed', 
+                success: false,
+                error: imgErr.message 
+            });
         }
 
         const post = await Post.create({
@@ -37,13 +64,17 @@ export const addNewPost = async (req, res) => {
             image: cloudResponse.secure_url,
             author: authorId
         });
+        
         const user = await User.findById(authorId);
         if (user) {
             user.posts.push(post._id);
             await user.save();
         }
 
-        await post.populate({ path: 'author', select: '-password' });
+        await post.populate({ 
+            path: 'author', 
+            select: 'username profilePicture' 
+        });
 
         return res.status(201).json({
             message: 'New post added',
@@ -53,9 +84,14 @@ export const addNewPost = async (req, res) => {
 
     } catch (error) {
         console.error('Add new post error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false,
+            error: error.message 
+        });
     }
 }
+
 export const getAllPost = async (req, res) => {
     try {
         const posts = await Post.find().sort({ createdAt: -1 })
@@ -73,10 +109,14 @@ export const getAllPost = async (req, res) => {
             success: true
         })
     } catch (error) {
-        console.error('Add new post error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        console.error('Get all posts error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 };
+
 export const getUserPost = async (req, res) => {
     try {
         const authorId = req.id;
@@ -99,16 +139,23 @@ export const getUserPost = async (req, res) => {
             success: true
         });
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({ message: 'Server error', success: false });
+        console.log('Get user posts error:', error);
+        return res.status(500).json({ 
+            message: 'Server error', 
+            success: false 
+        });
     }
 }
+
 export const likePost = async (req, res) => {
     try {
         const likeKrneWalaUserKiId = req.id;
         const postId = req.params.id; 
         const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ message: 'Post not found', success: false });
+        if (!post) return res.status(404).json({ 
+            message: 'Post not found', 
+            success: false 
+        });
 
         // like logic started
         await post.updateOne({ $addToSet: { likes: likeKrneWalaUserKiId } });
@@ -131,19 +178,30 @@ export const likePost = async (req, res) => {
             io.to(postOwnerSocketId).emit('notification', notification);
         }
 
-        return res.status(200).json({message:'Post liked', success:true});
+        return res.status(200).json({
+            message:'Post liked', 
+            success:true
+        });
     } catch (error) {
-
+        console.error('Like post error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 }
+
 export const dislikePost = async (req, res) => {
     try {
         const likeKrneWalaUserKiId = req.id;
         const postId = req.params.id;
         const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ message: 'Post not found', success: false });
+        if (!post) return res.status(404).json({ 
+            message: 'Post not found', 
+            success: false 
+        });
 
-        // like logic started
+        // dislike logic
         await post.updateOne({ $pull: { likes: likeKrneWalaUserKiId } });
         await post.save();
 
@@ -157,19 +215,25 @@ export const dislikePost = async (req, res) => {
                 userId:likeKrneWalaUserKiId,
                 userDetails:user,
                 postId,
-                message:'Your post was liked'
+                message:'Like removed from your post'
             }
             const postOwnerSocketId = getReceiverSocketId(postOwnerId);
             io.to(postOwnerSocketId).emit('notification', notification);
         }
 
-
-
-        return res.status(200).json({message:'Post disliked', success:true});
+        return res.status(200).json({
+            message:'Post disliked', 
+            success:true
+        });
     } catch (error) {
-
+        console.error('Dislike post error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 }
+
 export const addComment = async (req,res) =>{
     try {
         const postId = req.params.id;
@@ -179,7 +243,10 @@ export const addComment = async (req,res) =>{
 
         const post = await Post.findById(postId);
 
-        if(!text) return res.status(400).json({message:'text is required', success:false});
+        if(!text) return res.status(400).json({
+            message:'text is required', 
+            success:false
+        });
 
         const comment = await Comment.create({
             text,
@@ -202,35 +269,56 @@ export const addComment = async (req,res) =>{
         })
 
     } catch (error) {
-        console.error('Add new post error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        console.error('Add comment error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 };
+
 export const getCommentsOfPost = async (req,res) => {
     try {
         const postId = req.params.id;
 
-        const comments = await Comment.find({post:postId}).populate('author', 'username profilePicture');
+        const comments = await Comment.find({post:postId})
+            .populate('author', 'username profilePicture');
 
-        if(!comments) return res.status(404).json({message:'No comments found for this post', success:false});
+        if(!comments) return res.status(404).json({
+            message:'No comments found for this post', 
+            success:false
+        });
 
-        return res.status(200).json({success:true,comments});
+        return res.status(200).json({
+            success:true,
+            comments
+        });
 
     } catch (error) {
-        console.error('Add new post error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        console.error('Get comments error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 }
+
 export const deletePost = async (req,res) => {
     try {
         const postId = req.params.id;
         const authorId = req.id;
 
         const post = await Post.findById(postId);
-        if(!post) return res.status(404).json({message:'Post not found', success:false});
+        if(!post) return res.status(404).json({
+            message:'Post not found', 
+            success:false
+        });
 
         // check if the logged-in user is the owner of the post
-        if(post.author.toString() !== authorId) return res.status(403).json({message:'Unauthorized'});
+        if(post.author.toString() !== authorId) return res.status(403).json({
+            message:'Unauthorized',
+            success: false
+        });
 
         // delete post
         await Post.findByIdAndDelete(postId);
@@ -249,33 +337,51 @@ export const deletePost = async (req,res) => {
         })
 
     } catch (error) {
-        console.error('Add new post error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        console.error('Delete post error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 }
+
 export const bookmarkPost = async (req,res) => {
     try {
         const postId = req.params.id;
         const authorId = req.id;
         const post = await Post.findById(postId);
-        if(!post) return res.status(404).json({message:'Post not found', success:false});
+        if(!post) return res.status(404).json({
+            message:'Post not found', 
+            success:false
+        });
         
         const user = await User.findById(authorId);
         if(user.bookmarks.includes(post._id)){
             // already bookmarked -> remove from the bookmark
             await user.updateOne({$pull:{bookmarks:post._id}});
             await user.save();
-            return res.status(200).json({type:'unsaved', message:'Post removed from bookmark', success:true});
+            return res.status(200).json({
+                type:'unsaved', 
+                message:'Post removed from bookmark', 
+                success:true
+            });
 
         }else{
             // bookmark krna pdega
             await user.updateOne({$addToSet:{bookmarks:post._id}});
             await user.save();
-            return res.status(200).json({type:'saved', message:'Post bookmarked', success:true});
+            return res.status(200).json({
+                type:'saved', 
+                message:'Post bookmarked', 
+                success:true
+            });
         }
 
     } catch (error) {
-        console.error('Add new post error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        console.error('Bookmark post error:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 }

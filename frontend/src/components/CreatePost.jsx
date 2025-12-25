@@ -30,33 +30,85 @@ const CreatePost = ({ open, setOpen }) => {
   }
 
   const createPostHandler = async (e) => {
+    e.preventDefault();
+    
+    // Validate inputs
+    const trimmedCaption = caption.trim();
+    if (!trimmedCaption) {
+      toast.error("Please write a caption for your post");
+      return;
+    }
+    
+    if (!file) {
+      toast.error("Please select an image");
+      return;
+    }
+    
+    // Debug log
+    console.log("=== Creating Post ===");
+    console.log("Caption:", trimmedCaption);
+    console.log("File:", file.name, file.size, "bytes");
+    
     const formData = new FormData();
-    formData.append("caption", caption);
-    if (file) formData.append("image", file);
+    formData.append("caption", trimmedCaption);
+    formData.append("image", file);
+    
+    // Log FormData contents
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}:`, value instanceof File ? 
+        `File - ${value.name} (${value.size} bytes)` : 
+        `Text - "${value}"`);
+    }
+    
     try {
       setLoading(true);
-      const res = await axios.post('https://snapgrid-r8kd.onrender.com/api/v1/post/addpost', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        withCredentials: true
-      });
+      console.log("Sending to backend...");
+      
+      const res = await axios.post(
+        'https://snapgrid-r8kd.onrender.com/api/v1/post/addpost', 
+        formData, 
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          withCredentials: true
+        }
+      );
+      
+      console.log("Backend response:", res.data);
+      
       if (res.data.success) {
-        dispatch(setPosts([res.data.post, ...posts]));// [1] -> [1,2] -> total element = 2
+        dispatch(setPosts([res.data.post, ...posts]));
         toast.success(res.data.message);
         setOpen(false);
+        // Reset form
+        setCaption("");
+        setFile("");
+        setImagePreview("");
       }
     } catch (error) {
-      toast.error(error.response.data.message);
+      console.error("Upload error:", error);
+      console.error("Error response:", error.response?.data);
+      toast.error(error.response?.data?.message || "Upload failed");
     } finally {
       setLoading(false);
     }
   }
 
+  const handleClose = () => {
+    setOpen(false);
+    // Reset form when closing
+    setCaption("");
+    setFile("");
+    setImagePreview("");
+  }
+
   return (
-    <Dialog open={open}>
-      <DialogContent onInteractOutside={() => setOpen(false)}>
-        <DialogHeader className='text-center font-semibold'>Create New Post</DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent onInteractOutside={handleClose}>
+        <DialogHeader className='text-center font-semibold'>
+          Create New Post
+        </DialogHeader>
         <div className='flex gap-3 items-center'>
           <Avatar>
             <AvatarImage src={user?.profilePicture} alt="img" />
@@ -64,28 +116,55 @@ const CreatePost = ({ open, setOpen }) => {
           </Avatar>
           <div>
             <h1 className='font-semibold text-xs'>{user?.username}</h1>
-            <span className='text-gray-600 text-xs'>Bio here...</span>
+            <span className='text-gray-600 text-xs'>{user?.bio || "Bio here..."}</span>
           </div>
         </div>
-        <Textarea value={caption} onChange={(e) => setCaption(e.target.value)} className="focus-visible:ring-transparent border-none" placeholder="Write a caption..." />
+        <Textarea 
+          value={caption} 
+          onChange={(e) => setCaption(e.target.value)} 
+          className="focus-visible:ring-transparent border-none min-h-[100px]" 
+          placeholder="Write a caption..." 
+          required
+        />
         {
           imagePreview && (
             <div className='w-full h-64 flex items-center justify-center'>
-              <img src={imagePreview} alt="preview_img" className='object-cover h-full w-full rounded-md' />
+              <img 
+                src={imagePreview} 
+                alt="preview_img" 
+                className='object-cover h-full w-full rounded-md' 
+              />
             </div>
           )
         }
-        <input ref={imageRef} type='file' className='hidden' onChange={fileChangeHandler} />
-        <Button onClick={() => imageRef.current.click()} className='w-fit mx-auto bg-[#0095F6] hover:bg-[#258bcf] '>Select from computer</Button>
+        <input 
+          ref={imageRef} 
+          type='file' 
+          className='hidden' 
+          onChange={fileChangeHandler}
+          accept="image/*"
+        />
+        <Button 
+          onClick={() => imageRef.current.click()} 
+          className='w-fit mx-auto bg-[#0095F6] hover:bg-[#258bcf]'
+        >
+          {imagePreview ? "Change Image" : "Select from computer"}
+        </Button>
         {
           imagePreview && (
             loading ? (
-              <Button>
+              <Button disabled>
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                 Please wait
               </Button>
             ) : (
-              <Button onClick={createPostHandler} type="submit" className="w-full">Post</Button>
+              <Button 
+                onClick={createPostHandler} 
+                type="submit" 
+                className="w-full bg-[#0095F6] hover:bg-[#258bcf]"
+              >
+                Post
+              </Button>
             )
           )
         }

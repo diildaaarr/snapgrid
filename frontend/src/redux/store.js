@@ -16,19 +16,19 @@ import {
 } from 'redux-persist'
 import storage from 'redux-persist/lib/storage'
 
-
 const persistConfig = {
     key: 'root',
     version: 1,
     storage,
+    blacklist: ['socketio'], // ADD THIS LINE - prevents socket from being persisted
 }
 
 const rootReducer = combineReducers({
-    auth:authSlice,
-    post:postSlice,
-    socketio:socketSlice,
-    chat:chatSlice,
-    realTimeNotification:rtnSlice
+    auth: authSlice,
+    post: postSlice,
+    socketio: socketSlice,
+    chat: chatSlice,
+    realTimeNotification: rtnSlice
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)
@@ -39,6 +39,7 @@ const store = configureStore({
         getDefaultMiddleware({
             serializableCheck: {
                 ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+                ignoredPaths: ['socketio.socket'], // ADD THIS LINE - ignores socket in checks
             },
         }),
 });

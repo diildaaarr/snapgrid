@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import ChatPage from './components/ChatPage'
 import EditProfile from './components/EditProfile'
 import Home from './components/Home'
@@ -6,6 +6,7 @@ import Login from './components/Login'
 import MainLayout from './components/MainLayout'
 import Profile from './components/Profile'
 import Signup from './components/Signup'
+import Search from './components/Search'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { io } from "socket.io-client";
 import { useDispatch, useSelector } from 'react-redux'
@@ -13,7 +14,6 @@ import { setSocket } from './redux/socketSlice'
 import { setOnlineUsers } from './redux/chatSlice'
 import { setLikeNotification } from './redux/rtnSlice'
 import ProtectedRoutes from './components/ProtectedRoutes'
-
 
 const browserRouter = createBrowserRouter([
   {
@@ -26,7 +26,7 @@ const browserRouter = createBrowserRouter([
       },
       {
         path: '/profile/:id',
-        element: <ProtectedRoutes> <Profile /></ProtectedRoutes>
+        element: <ProtectedRoutes><Profile /></ProtectedRoutes>
       },
       {
         path: '/account/edit',
@@ -35,6 +35,10 @@ const browserRouter = createBrowserRouter([
       {
         path: '/chat',
         element: <ProtectedRoutes><ChatPage /></ProtectedRoutes>
+      },
+      {
+        path: '/search',
+        element: <ProtectedRoutes><Search /></ProtectedRoutes>
       },
     ]
   },
@@ -50,35 +54,40 @@ const browserRouter = createBrowserRouter([
 
 function App() {
   const { user } = useSelector(store => store.auth);
-  const { socket } = useSelector(store => store.socketio);
+  const socketRef = useRef(null); // Use ref to store socket instance
   const dispatch = useDispatch();
 
   useEffect(() => {
     if (user) {
-      const socketio = io('https://snapgrid-r8kd.onrender.com', {
+      // Create socket connection
+      socketRef.current = io('https://snapgrid-r8kd.onrender.com', {
         query: {
           userId: user?._id
         },
         transports: ['websocket']
       });
-      // DO NOT dispatch socket instance to redux as it's not serializable!
-      // dispatch(setSocket(socketio));
+      
+      // Store socket in Redux (but it's blacklisted from persistence)
+      dispatch(setSocket(socketRef.current));
 
-      // listen all the events
-      socketio.on('getOnlineUsers', (onlineUsers) => {
+      // Listen to all the events
+      socketRef.current.on('getOnlineUsers', (onlineUsers) => {
         dispatch(setOnlineUsers(onlineUsers));
       });
 
-      socketio.on('notification', (notification) => {
+      socketRef.current.on('notification', (notification) => {
         dispatch(setLikeNotification(notification));
       });
 
       return () => {
-        socketio.close();
+        if (socketRef.current) {
+          socketRef.current.close();
+        }
         dispatch(setSocket(null));
       }
-    } else if (socket) {
-      socket.close();
+    } else if (socketRef.current) {
+      socketRef.current.close();
+      socketRef.current = null;
       dispatch(setSocket(null));
     }
   }, [user, dispatch]);

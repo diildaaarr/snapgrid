@@ -4,92 +4,112 @@ import jwt from "jsonwebtoken";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloudinary.js";
 import { Post } from "../models/post.model.js";
+
 export const register = async (req, res) => {
     try {
         const { username, email, password } = req.body;
         if (!username || !email || !password) {
-            return res.status(401).json({
-                message: "Something is missing, please check!",
+            return res.status(400).json({
+                message: "All fields are required",
                 success: false,
             });
         }
+        
         const user = await User.findOne({ email });
         if (user) {
-            return res.status(401).json({
-                message: "Try different email",
+            return res.status(400).json({
+                message: "Email already exists",
                 success: false,
             });
         };
+        
         const hashedPassword = await bcrypt.hash(password, 10);
         await User.create({
             username,
             email,
             password: hashedPassword
         });
+        
         return res.status(201).json({
             message: "Account created successfully.",
             success: true,
         });
     } catch (error) {
-        console.log(error);
+        console.error("Registration error:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+        });
     }
 }
+
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
-            return res.status(401).json({
-                message: "Something is missing, please check!",
+            return res.status(400).json({
+                message: "Email and password are required",
                 success: false,
             });
         }
+        
         let user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({
-                message: "Incorrect email or password",
+                message: "Invalid email or password",
                 success: false,
             });
         }
+        
         const isPasswordMatch = await bcrypt.compare(password, user.password);
         if (!isPasswordMatch) {
             return res.status(401).json({
-                message: "Incorrect email or password",
+                message: "Invalid email or password",
                 success: false,
             });
         };
 
-        const token = await jwt.sign({ userId: user._id }, process.env.SECRET_KEY, { expiresIn: '1d' });
+        const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, { expiresIn: '1d' });
 
-        // populate each post if in the posts array
-        const populatedPosts = await Promise.all(
-            user.posts.map( async (postId) => {
-                const post = await Post.findById(postId);
-                if(post.author.equals(user._id)){
-                    return post;
-                }
-                return null;
+        // Fix: Better way to populate posts
+        const populatedUser = await User.findById(user._id)
+            .populate({
+                path: 'posts',
+                options: { sort: { createdAt: -1 } }
             })
-        )
-        user = {
-            _id: user._id,
-            username: user.username,
-            email: user.email,
-            profilePicture: user.profilePicture,
-            bio: user.bio,
-            followers: user.followers,
-            following: user.following,
-            posts: populatedPosts
-        }
-        return res.cookie('token', token, { httpOnly: true, sameSite: 'strict', maxAge: 1 * 24 * 60 * 60 * 1000 }).json({
-            message: `Welcome back ${user.username}`,
+            .select('-password');
+
+        const userResponse = {
+            _id: populatedUser._id,
+            username: populatedUser.username,
+            email: populatedUser.email,
+            profilePicture: populatedUser.profilePicture,
+            bio: populatedUser.bio,
+            followers: populatedUser.followers,
+            following: populatedUser.following,
+            posts: populatedUser.posts || [],
+            bookmarks: populatedUser.bookmarks || []
+        };
+
+        return res.cookie('token', token, { 
+            httpOnly: true, 
+            sameSite: 'strict', 
+            maxAge: 1 * 24 * 60 * 60 * 1000 
+        }).json({
+            message: `Welcome back ${userResponse.username}`,
             success: true,
-            user
+            user: userResponse
         });
 
     } catch (error) {
-        console.log(error);
+        console.error("Login error:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+        });
     }
 };
+
 export const logout = async (_, res) => {
     try {
         return res.cookie("token", "", { maxAge: 0 }).json({
@@ -97,19 +117,42 @@ export const logout = async (_, res) => {
             success: true
         });
     } catch (error) {
-        console.log(error);
+        console.error("Logout error:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+        });
     }
 };
+
 export const getProfile = async (req, res) => {
     try {
         const userId = req.params.id;
-        let user = await User.findById(userId).populate({path:'posts', createdAt:-1}).populate('bookmarks');
+        let user = await User.findById(userId)
+            .populate({
+                path: 'posts',
+                options: { sort: { createdAt: -1 } }
+            })
+            .populate('bookmarks')
+            .select('-password');
+        
+        if (!user) {
+            return res.status(404).json({
+                message: 'User not found',
+                success: false
+            });
+        }
+        
         return res.status(200).json({
             user,
             success: true
         });
     } catch (error) {
-        console.log(error);
+        console.error("Get profile error:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+        });
     }
 };
 
@@ -132,6 +175,7 @@ export const editProfile = async (req, res) => {
                 success: false
             });
         };
+        
         if (bio) user.bio = bio;
         if (gender) user.gender = gender;
         if (profilePicture) user.profilePicture = cloudResponse.secure_url;
@@ -145,80 +189,155 @@ export const editProfile = async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error);
+        console.error("Edit profile error:", error);
+        return res.status(500).json({
+            message: "Internal server error",
+            success: false,
+        });
     }
 };
+
 export const getSuggestedUsers = async (req, res) => {
     try {
-        const suggestedUsers = await User.find({ _id: { $ne: req.id } }).select("-password");
-        if (!suggestedUsers) {
-            return res.status(400).json({
-                message: 'Currently do not have any users',
-            })
-        };
+        const limit = req.query.limit ? parseInt(req.query.limit) : 5;
+        
+        let query = User.find({ _id: { $ne: req.id } }).select("-password");
+        
+        // If limit is provided and greater than 0, apply it. Otherwise, return all users
+        if (limit > 0) {
+            query = query.limit(limit);
+        }
+        
+        const suggestedUsers = await query;
+        
         return res.status(200).json({
             success: true,
             users: suggestedUsers
         })
     } catch (error) {
-        console.error('Follow/Unfollow error:', error);
-        res.status(500).json({ message: 'Internal server error', success: false });
+        console.error('Get suggested users error:', error);
+        return res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
     }
 };
+
+export const searchUsers = async (req, res) => {
+    try {
+        const { query } = req.query;
+        
+        let users;
+        
+        if (!query || query.trim() === '') {
+            // If no query, return all users sorted by username
+            users = await User.find({ 
+                _id: { $ne: req.id } // Exclude current user
+            })
+            .select("-password")
+            .sort({ username: 1 }); // Sort alphabetically by username
+        } else {
+            // If query exists, search by username
+            const searchQuery = new RegExp(query, 'i'); // Case-insensitive search
+            users = await User.find({ 
+                username: searchQuery,
+                _id: { $ne: req.id } // Exclude current user
+            })
+            .select("-password")
+            .sort({ username: 1 }); // Sort alphabetically by username
+        }
+        
+        return res.status(200).json({
+            success: true,
+            users: users
+        });
+    } catch (error) {
+        console.error('Search users error:', error);
+        return res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false 
+        });
+    }
+};
+
 export const followOrUnfollow = async (req, res) => {
     try {
-        const followKrneWala = req.id; // patel
-        const jiskoFollowKrunga = req.params.id; // shivani
+        const followerId = req.id; // Current user
+        const followingId = req.params.id; // User to follow/unfollow
 
-        if (!followKrneWala) {
-            console.log('Error: followKrneWala (req.id) is undefined');
+        console.log("Follow/Unfollow request:");
+        console.log("Follower ID:", followerId);
+        console.log("Following ID:", followingId);
+
+        if (!followerId) {
             return res.status(401).json({
                 message: 'User not authenticated',
                 success: false
             });
         }
-        if (!jiskoFollowKrunga) {
-            console.log('Error: jiskoFollowKrunga (req.params.id) is undefined');
+        
+        if (!followingId) {
             return res.status(400).json({
                 message: 'No user specified to follow/unfollow',
                 success: false
             });
         }
-        if (followKrneWala === jiskoFollowKrunga) {
+        
+        if (followerId === followingId) {
             return res.status(400).json({
                 message: 'You cannot follow/unfollow yourself',
                 success: false
             });
         }
 
-        const user = await User.findById(followKrneWala);
-        const targetUser = await User.findById(jiskoFollowKrunga);
+        const follower = await User.findById(followerId);
+        const following = await User.findById(followingId);
 
-        if (!user || !targetUser) {
-            console.log('Error: Either follower or target user not found');
-            return res.status(400).json({
+        if (!follower || !following) {
+            return res.status(404).json({
                 message: 'User not found',
                 success: false
             });
         }
-        // mai check krunga ki follow krna hai ya unfollow
-        const isFollowing = user.following.includes(jiskoFollowKrunga);
+
+        // Check if already following - convert to string for comparison
+        const isFollowing = follower.following.some(id => id.toString() === followingId.toString());
+        
         if (isFollowing) {
-            // unfollow logic ayega
+            // Unfollow logic
             await Promise.all([
-                User.updateOne({ _id: followKrneWala }, { $pull: { following: jiskoFollowKrunga } }),
-                User.updateOne({ _id: jiskoFollowKrunga }, { $pull: { followers: followKrneWala } }),
-            ])
-            return res.status(200).json({ message: 'Unfollowed successfully', success: true });
+                User.updateOne({ _id: followerId }, { $pull: { following: followingId } }),
+                User.updateOne({ _id: followingId }, { $pull: { followers: followerId } }),
+            ]);
+            
+            console.log(`User ${followerId} unfollowed ${followingId}`);
+            
+            return res.status(200).json({ 
+                message: 'Unfollowed successfully', 
+                success: true,
+                action: 'unfollow'
+            });
         } else {
-            // follow logic ayega
+            // Follow logic
             await Promise.all([
-                User.updateOne({ _id: followKrneWala }, { $push: { following: jiskoFollowKrunga } }),
-                User.updateOne({ _id: jiskoFollowKrunga }, { $push: { followers: followKrneWala } }),
-            ])
-            return res.status(200).json({ message: 'followed successfully', success: true });
+                User.updateOne({ _id: followerId }, { $push: { following: followingId } }),
+                User.updateOne({ _id: followingId }, { $push: { followers: followerId } }),
+            ]);
+            
+            console.log(`User ${followerId} followed ${followingId}`);
+            
+            return res.status(200).json({ 
+                message: 'Followed successfully', 
+                success: true,
+                action: 'follow'
+            });
         }
     } catch (error) {
-        console.log(error);
+        console.error('Follow/Unfollow error:', error);
+        return res.status(500).json({ 
+            message: 'Internal server error', 
+            success: false,
+            error: error.message 
+        });
     }
 }

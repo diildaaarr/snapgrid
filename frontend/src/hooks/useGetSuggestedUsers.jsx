@@ -9,7 +9,8 @@ const useGetSuggestedUsers = () => {
     useEffect(() => {
         const fetchSuggestedUsers = async () => {
             try {
-                const res = await axios.get('https://snapgrid-r8kd.onrender.com/api/v1/user/suggested', { withCredentials: true });
+                // Fetch only 5 users initially
+                const res = await axios.get('https://snapgrid-r8kd.onrender.com/api/v1/user/suggested?limit=5', { withCredentials: true });
                 if (res.data.success) { 
                     dispatch(setSuggestedUsers(res.data.users));
                 }
@@ -18,6 +19,6 @@ const useGetSuggestedUsers = () => {
             }
         }
         fetchSuggestedUsers();
-    }, []);
+    }, [dispatch]);
 };
 export default useGetSuggestedUsers;
