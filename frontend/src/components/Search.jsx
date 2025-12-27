@@ -131,7 +131,7 @@ const Search = () => {
                                         <Link to={`/profile/${user._id}`} className='flex-shrink-0'>
                                             <Avatar className='w-10 h-10 sm:w-14 sm:h-14 border-2 border-gray-100'>
                                                 <AvatarImage src={user?.profilePicture} alt="profile" />
-                                                <AvatarFallback>CN</AvatarFallback>
+                                                <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                                             </Avatar>
                                         </Link>
                                         <div className='flex-1 min-w-0'>

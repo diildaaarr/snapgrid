@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from './ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Link, useNavigate } from 'react-router-dom'
-import { MoreHorizontal, Heart, Send, MessageCircle } from 'lucide-react'
+import { MoreHorizontal, Heart, Send, MessageCircle, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { useDispatch, useSelector } from 'react-redux'
@@ -12,26 +12,54 @@ import { toast } from 'sonner'
 import { setPosts } from '@/redux/postSlice'
 import { setAuthUser, setSelectedUser } from '@/redux/authSlice'
 
-const CommentDialog = ({ open, setOpen }) => {
+const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => {
   const [text, setText] = useState("");
-  const { selectedPost, posts } = useSelector(store => store.post);
+  const { selectedPost: reduxSelectedPost, posts } = useSelector(store => store.post);
   const { user } = useSelector(store => store.auth);
   const [comment, setComment] = useState([]);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const commentsEndRef = useRef(null);
 
+  // Use post prop if provided, otherwise fallback to Redux selectedPost
+  const selectedPost = post || reduxSelectedPost;
+
+  // Fetch complete post data when dialog opens
   useEffect(() => {
-    if (selectedPost) {
-      setComment(selectedPost.comments || []);
-      setLikeCount(selectedPost.likes?.length || 0);
-      setLiked(selectedPost.likes?.includes(user?._id) || false);
-      setIsBookmarked(user?.bookmarks?.some(id => id.toString() === selectedPost._id.toString()) || false);
+    if (open && selectedPost?._id) {
+      const fetchCompletePost = async () => {
+        try {
+          setIsLoading(true);
+          const res = await axios.get(
+            `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost._id}`,
+            { withCredentials: true }
+          );
+          if (res.data.success && res.data.post) {
+            const completePost = res.data.post;
+            setComment(completePost.comments || []);
+            setLikeCount(completePost.likes?.length || 0);
+            setLiked(completePost.likes?.includes(user?._id) || false);
+            setIsBookmarked(user?.bookmarks?.some(id => id.toString() === completePost._id.toString()) || false);
+          }
+        } catch (error) {
+          console.error("Error fetching post:", error);
+          // Fallback to selectedPost data if fetch fails
+          setComment(selectedPost.comments || []);
+          setLikeCount(selectedPost.likes?.length || 0);
+          setLiked(selectedPost.likes?.includes(user?._id) || false);
+          setIsBookmarked(user?.bookmarks?.some(id => id.toString() === selectedPost._id.toString()) || false);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchCompletePost();
     }
-  }, [selectedPost, user?._id, user?.bookmarks]);
+  }, [open, selectedPost?._id, user?._id, user?.bookmarks]);
 
   useEffect(() => {
     if (open && commentsEndRef.current && selectedPost) {
@@ -59,12 +87,19 @@ const CommentDialog = ({ open, setOpen }) => {
       );
 
       if (res.data.success) {
-        const updatedCommentData = [...comment, res.data.comment];
-        setComment(updatedCommentData);
+        // Fetch the complete updated post to ensure all comments are synced
+        const postRes = await axios.get(
+          `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost._id}`,
+          { withCredentials: true }
+        );
+        
+        if (postRes.data.success && postRes.data.post) {
+          setComment(postRes.data.post.comments || []);
+        } else {
+          const updatedCommentData = [...comment, res.data.comment];
+          setComment(updatedCommentData);
+        }
 
-        // Don't dispatch setPosts to avoid changing the global order of posts
-        // The posts order should be maintained as received from the backend
-        // Removed toast success message as requested
         setText("");
       }
     } catch (error) {
@@ -74,25 +109,74 @@ const CommentDialog = ({ open, setOpen }) => {
   }
 
   const likeOrDislikeHandler = async () => {
-    if (!selectedPost) return;
+    if (!selectedPost || !user?._id) return;
     
+    // If a custom like handler is provided (from ProfilePostGrid), use it
+    if (onLikeHandler) {
+      const currentLiked = liked;
+      try {
+        await onLikeHandler(selectedPost);
+        // Update local state immediately for UI feedback
+        setLiked(!currentLiked);
+        setLikeCount(prev => currentLiked ? prev - 1 : prev + 1);
+        
+        // Then fetch the latest data to ensure accuracy
+        setTimeout(async () => {
+          try {
+            const postRes = await axios.get(
+              `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost._id}`,
+              { withCredentials: true }
+            );
+            if (postRes.data.success && postRes.data.post) {
+              setLikeCount(postRes.data.post.likes?.length || 0);
+              setLiked(postRes.data.post.likes?.includes(user._id) || false);
+            }
+          } catch (error) {
+            console.log('Error fetching updated post:', error);
+          }
+        }, 100);
+      } catch (error) {
+        console.log('Like handler error:', error);
+        toast.error('Failed to update like');
+      }
+      return;
+    }
+    
+    // Otherwise, use the default handler for Redux posts
     try {
       const action = liked ? 'dislike' : 'like';
-      const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost._id}/${action}`, { withCredentials: true });
+      const res = await axios.get(
+        `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost._id}/${action}`, 
+        { withCredentials: true }
+      );
+      
       if (res.data.success) {
-        setLiked(!liked);
-        setLikeCount(prev => liked ? prev - 1 : prev + 1);
+        // Update like count from response
+        const updatedLikes = res.data.likes || [];
+        setLikeCount(updatedLikes.length);
+        setLiked(updatedLikes.includes(user._id));
         
+        // Update Redux store with new likes
         const updatedPostData = posts.map(p =>
           p._id === selectedPost._id ? {
             ...p,
-            likes: liked ? p.likes.filter(id => id !== user?._id) : [...(p.likes || []), user?._id]
+            likes: updatedLikes
           } : p
         );
         dispatch(setPosts(updatedPostData));
+        
+        // Notify parent component about the like change
+        if (onLikeChange) {
+          onLikeChange({
+            postId: selectedPost._id,
+            likes: updatedLikes,
+            liked: updatedLikes.includes(user._id)
+          });
+        }
       }
     } catch (error) {
-      console.log(error);
+      console.log('Like/Dislike error:', error);
+      toast.error('Failed to update like');
     }
   }
 
@@ -109,7 +193,11 @@ const CommentDialog = ({ open, setOpen }) => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent onInteractOutside={() => setOpen(false)} className="max-w-[95vw] md:max-w-6xl h-[85vh] md:h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent 
+        onInteractOutside={() => setOpen(false)} 
+        className="max-w-[95vw] md:max-w-6xl h-[85vh] md:h-[90vh] p-0 flex flex-col overflow-hidden"
+        onEscapeKeyDown={() => setOpen(false)}
+      >
         <DialogTitle className="sr-only">Comments</DialogTitle>
         <div className='flex flex-1 min-h-0 flex-col md:flex-row'>
           {/* Image Section */}
@@ -135,7 +223,7 @@ const CommentDialog = ({ open, setOpen }) => {
                   </Avatar>
                 </Link>
                 <div className='min-w-0'>
-                  <Link 
+                  <Link
                     to={`/profile/${selectedPost?.author?._id}`}
                     onClick={() => setOpen(false)}
                     className='font-semibold text-xs sm:text-sm hover:underline block truncate'
@@ -147,10 +235,11 @@ const CommentDialog = ({ open, setOpen }) => {
                   )}
                 </div>
               </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <MoreHorizontal className='cursor-pointer hover:text-gray-600 transition-colors' />
-                </DialogTrigger>
+              <div className='flex items-center gap-2'>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <MoreHorizontal className='cursor-pointer hover:text-gray-600 transition-colors' />
+                  </DialogTrigger>
                 <DialogContent className="flex flex-col items-center text-sm text-center gap-2 p-4">
                   <DialogTitle>Post Options</DialogTitle>
                   {!isAuthor && (
@@ -246,6 +335,14 @@ const CommentDialog = ({ open, setOpen }) => {
                   )}
                 </DialogContent>
               </Dialog>
+              {/* Close button */}
+              <button
+                onClick={() => setOpen(false)}
+                className='p-2 hover:bg-gray-100 rounded-full transition-colors'
+              >
+                <X className='w-5 h-5 text-gray-600' />
+              </button>
+              </div>
             </div>
 
             {/* Actions Bar */}
@@ -262,7 +359,11 @@ const CommentDialog = ({ open, setOpen }) => {
 
             {/* Comments List */}
             <div className='flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4'>
-              {comment.length > 0 ? (
+              {isLoading ? (
+                <div className='flex items-center justify-center h-full'>
+                  <p className='text-gray-500 text-sm'>Loading comments...</p>
+                </div>
+              ) : comment.length > 0 ? (
                 <>
                   {comment.map((commentItem) => (
                     <Comment key={commentItem._id} comment={commentItem} />

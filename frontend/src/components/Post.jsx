@@ -19,20 +19,22 @@ const Post = ({ post }) => {
     const [imageOpen, setImageOpen] = useState(false);
     const { user } = useSelector(store => store.auth);
     const { posts } = useSelector(store => store.post);
-    const [liked, setLiked] = useState(post.likes.includes(user?._id) || false);
-    const [postLike, setPostLike] = useState(post.likes.length);
-    const [comment, setComment] = useState(post.comments);
+    const [liked, setLiked] = useState((post.likes || []).includes(user?._id) || false);
+    const [postLike, setPostLike] = useState((post.likes || []).length);
+    const [comment, setComment] = useState(post.comments || []);
     const [isBookmarked, setIsBookmarked] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
     // Check if post is bookmarked
     useEffect(() => {
-        if (user?.bookmarks) {
-            const bookmarked = user.bookmarks.some(bookmarkId => bookmarkId.toString() === post._id.toString());
+        if (user?.bookmarks && Array.isArray(user.bookmarks) && post?._id) {
+            const bookmarked = user.bookmarks.some(bookmarkId =>
+                bookmarkId && bookmarkId.toString && bookmarkId.toString() === post._id.toString()
+            );
             setIsBookmarked(bookmarked);
         }
-    }, [user?.bookmarks, post._id]);
+    }, [user?.bookmarks, post?._id]);
 
     const changeEventHandler = (e) => {
         const inputText = e.target.value;
@@ -116,7 +118,7 @@ const Post = ({ post }) => {
                     } else {
                         // Remove from bookmarks
                         updatedUser.bookmarks = (updatedUser.bookmarks || []).filter(
-                            bookmarkId => bookmarkId.toString() !== post._id.toString()
+                            bookmarkId => !bookmarkId || (bookmarkId.toString && bookmarkId.toString() !== post?._id?.toString())
                         );
                     }
                     dispatch(setAuthUser(updatedUser));
@@ -137,7 +139,7 @@ const Post = ({ post }) => {
                     <Link to={`/profile/${post.author?._id}`} className='flex-shrink-0'>
                         <Avatar className='border border-gray-200 w-8 h-8 sm:w-10 sm:h-10 cursor-pointer'>
                             <AvatarImage src={post.author?.profilePicture} alt="post_image" />
-                            <AvatarFallback>CN</AvatarFallback>
+                            <AvatarFallback>{post.author?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
                     </Link>
                     <div className='flex items-center gap-2 sm:gap-3'>
@@ -157,18 +159,18 @@ const Post = ({ post }) => {
                                 <Button 
                                     variant='ghost' 
                                     className={`cursor-pointer w-full font-semibold hover:bg-gray-100 ${
-                                        user?.following?.some(id => id.toString() === post.author._id.toString()) 
+                                        (Array.isArray(user?.following) && post.author?._id) && user.following.some(id => id && id.toString && id.toString() === post.author._id.toString()) 
                                             ? 'text-[#ED4956]' 
                                             : 'text-[#0095F6]'
                                     }`}
                                     onClick={async () => {
                                         try {
-                                            const res = await axios.post(`https://snapgrid-r8kd.onrender.com/api/v1/user/followorunfollow/${post.author._id}`, {}, { withCredentials: true });
+                                            const res = await axios.post(`https://snapgrid-r8kd.onrender.com/api/v1/user/followorunfollow/${post.author?._id}`, {}, { withCredentials: true });
                                             if (res.data.success) {
                                                 if (user) {
                                                     const updatedUser = { ...user };
                                                     if (res.data.action === 'unfollow') {
-                                                        updatedUser.following = (updatedUser.following || []).filter(id => id.toString() !== post.author._id.toString());
+                                                        updatedUser.following = (updatedUser.following || []).filter(id => !id || (id.toString && id.toString() !== post.author._id.toString()));
                                                     } else {
                                                         updatedUser.following = [...(updatedUser.following || []), post.author._id];
                                                     }
@@ -182,7 +184,7 @@ const Post = ({ post }) => {
                                         }
                                     }}
                                 >
-                                    {user?.following?.some(id => id.toString() === post.author._id.toString()) ? 'Unfollow' : 'Follow'}
+                                    {(Array.isArray(user?.following) && post.author?._id) && user.following.some(id => id && id.toString && id.toString() === post.author._id.toString()) ? 'Unfollow' : 'Follow'}
                                 </Button>
                                 <Button 
                                     variant='ghost' 
@@ -281,7 +283,48 @@ const Post = ({ post }) => {
                     }} className='cursor-pointer text-sm text-gray-400'>View all {comment.length} comments</span>
                 )
             }
-            <CommentDialog open={open} setOpen={setOpen} />
+            <CommentDialog 
+                open={open} 
+                setOpen={setOpen}
+                post={post}
+                onLikeHandler={async () => {
+                    try {
+                        const action = liked ? 'dislike' : 'like';
+                        const res = await axios.get(
+                            `https://snapgrid-r8kd.onrender.com/api/v1/post/${post._id}/${action}`, 
+                            { withCredentials: true }
+                        );
+                        if (res.data.success) {
+                            const updatedLikes = res.data.likes || [];
+                            setPostLike(updatedLikes.length);
+                            setLiked(updatedLikes.includes(user?._id));
+                            
+                            // Update Redux posts
+                            const updatedPostData = posts.map(p =>
+                                p._id === post._id ? {
+                                    ...p,
+                                    likes: updatedLikes
+                                } : p
+                            );
+                            dispatch(setPosts(updatedPostData));
+                            toast.success(res.data.message);
+                        }
+                    } catch (error) {
+                        console.log(error);
+                        toast.error('Failed to update like');
+                    }
+                }}
+                onLikeChange={(data) => {
+                    // Update the post with new like data
+                    const updatedPosts = posts.map(p =>
+                        p._id === data.postId ? {
+                            ...p,
+                            likes: data.likes
+                        } : p
+                    );
+                    dispatch(setPosts(updatedPosts));
+                }}
+            />
             <div className='flex items-center justify-between'>
                 <input
                     type="text"

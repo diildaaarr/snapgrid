@@ -147,23 +147,59 @@ export const getUserPost = async (req, res) => {
     }
 }
 
+export const getPostById = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const post = await Post.findById(postId)
+            .populate({ path: 'author', select: 'username profilePicture' })
+            .populate({
+                path: 'comments',
+                sort: { createdAt: -1 },
+                populate: {
+                    path: 'author',
+                    select: 'username profilePicture'
+                }
+            });
+        
+        if (!post) {
+            return res.status(404).json({ 
+                message: 'Post not found', 
+                success: false 
+            });
+        }
+
+        return res.status(200).json({
+            post,
+            success: true
+        });
+    } catch (error) {
+        console.log('Get post by id error:', error);
+        return res.status(500).json({ 
+            message: 'Server error', 
+            success: false 
+        });
+    }
+}
+
 export const likePost = async (req, res) => {
     try {
         const likeKrneWalaUserKiId = req.id;
-        const postId = req.params.id; 
+        const postId = req.params.id;
         const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ 
-            message: 'Post not found', 
-            success: false 
+        if (!post) return res.status(404).json({
+            message: 'Post not found',
+            success: false
         });
 
         // like logic started
         await post.updateOne({ $addToSet: { likes: likeKrneWalaUserKiId } });
-        await post.save();
+
+        // Get updated likes array
+        const updatedPost = await Post.findById(postId);
 
         // implement socket io for real time notification
         const user = await User.findById(likeKrneWalaUserKiId).select('username profilePicture');
-         
+
         const postOwnerId = post.author.toString();
         if(postOwnerId !== likeKrneWalaUserKiId){
             // emit a notification event
@@ -179,14 +215,15 @@ export const likePost = async (req, res) => {
         }
 
         return res.status(200).json({
-            message:'Post liked', 
-            success:true
+            message:'Post liked',
+            success:true,
+            likes: updatedPost.likes
         });
     } catch (error) {
         console.error('Like post error:', error);
-        res.status(500).json({ 
-            message: 'Internal server error', 
-            success: false 
+        res.status(500).json({
+            message: 'Internal server error',
+            success: false
         });
     }
 }
@@ -196,14 +233,16 @@ export const dislikePost = async (req, res) => {
         const likeKrneWalaUserKiId = req.id;
         const postId = req.params.id;
         const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ 
-            message: 'Post not found', 
-            success: false 
+        if (!post) return res.status(404).json({
+            message: 'Post not found',
+            success: false
         });
 
         // dislike logic
         await post.updateOne({ $pull: { likes: likeKrneWalaUserKiId } });
-        await post.save();
+
+        // Get updated likes array
+        const updatedPost = await Post.findById(postId);
 
         // implement socket io for real time notification
         const user = await User.findById(likeKrneWalaUserKiId).select('username profilePicture');
@@ -222,14 +261,15 @@ export const dislikePost = async (req, res) => {
         }
 
         return res.status(200).json({
-            message:'Post disliked', 
-            success:true
+            message:'Post disliked',
+            success:true,
+            likes: updatedPost.likes
         });
     } catch (error) {
         console.error('Dislike post error:', error);
-        res.status(500).json({ 
-            message: 'Internal server error', 
-            success: false 
+        res.status(500).json({
+            message: 'Internal server error',
+            success: false
         });
     }
 }

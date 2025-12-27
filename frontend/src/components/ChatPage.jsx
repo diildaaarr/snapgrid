@@ -4,33 +4,147 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { setSelectedUser } from '@/redux/authSlice';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { MessageCircleCode, Send, Search, ArrowLeft } from 'lucide-react';
+import { MessageCircleCode, Send, Search, ArrowLeft, MoreVertical } from 'lucide-react';
 import Messages from './Messages';
 import axios from 'axios';
-import { setMessages } from '@/redux/chatSlice';
+import { 
+    setMessages, 
+    setConversations, 
+    addMessage, 
+    removeTempMessage,
+    updateConversationLastMessage,
+    removeConversation 
+} from '@/redux/chatSlice';
+import useGetConversations from '@/hooks/useGetConversations';
+import useGetRTM from '@/hooks/useGetRTM';
+import useGetAllMessage from '@/hooks/useGetAllMessage';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog';
 
 const ChatPage = () => {
     const [textMessage, setTextMessage] = useState("");
-    const { user, suggestedUsers, selectedUser } = useSelector(store => store.auth);
-    const { onlineUsers, messages } = useSelector(store => store.chat);
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        action: null,
+        actionType: '' // 'clearChat' or 'deleteUser'
+    });
+    const { user, selectedUser } = useSelector(store => store.auth);
+    const { onlineUsers, messages, conversations } = useSelector(store => store.chat);
     const dispatch = useDispatch();
 
-    const sendMessageHandler = async (receiverId) => {
-        if (!textMessage.trim()) return;
-        
+    useGetConversations();
+    useGetRTM();
+    useGetAllMessage(); // This fetches messages when selectedUser changes
+
+    const deleteUserHandler = async () => {
+        if (!selectedUser) return;
+
         try {
-            const res = await axios.post(`https://snapgrid-r8kd.onrender.com/api/v1/message/send/${receiverId}`, { textMessage }, {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                withCredentials: true
-            });
+            const res = await axios.delete(
+                `https://snapgrid-r8kd.onrender.com/api/v1/message/delete-user/${selectedUser._id}`,
+                { withCredentials: true }
+            );
+
             if (res.data.success) {
-                dispatch(setMessages([...messages, res.data.newMessage]));
-                setTextMessage("");
+                // The conversation will be hidden via the clearedBy filter
+                // Remove from local state and clear selection
+                dispatch(removeConversation(selectedUser._id));
+                dispatch(setSelectedUser(null));
+                dispatch(setMessages([]));
             }
         } catch (error) {
-            console.log(error);
+            console.log('Error deleting user from conversations:', error);
+        }
+    };
+
+    const clearChatHandler = async () => {
+        if (!selectedUser) return;
+
+        try {
+            const res = await axios.delete(
+                `https://snapgrid-r8kd.onrender.com/api/v1/message/clear-chat/${selectedUser._id}`,
+                { withCredentials: true }
+            );
+
+            if (res.data.success) {
+                // Clear messages for this conversation only
+                dispatch(setMessages([]));
+
+                // Update conversation to show "No messages yet"
+                dispatch(updateConversationLastMessage({
+                    userId: selectedUser._id,
+                    lastMessage: ''
+                }));
+            }
+        } catch (error) {
+            console.log('Error clearing chat:', error);
+        }
+    };
+
+    const sendMessageHandler = async (receiverId) => {
+        if (!textMessage.trim() || !receiverId) return;
+
+        const messageText = textMessage.trim();
+        const tempId = `temp-${Date.now()}`;
+
+        // Create temporary message for instant UI feedback
+        const tempMessage = {
+            _id: tempId,
+            senderId: user._id,
+            receiverId: receiverId,
+            message: messageText,
+            createdAt: new Date().toISOString(),
+            isTemp: true // Flag to identify temporary messages
+        };
+
+        // Immediately add message to UI
+        dispatch(addMessage(tempMessage));
+        setTextMessage("");
+
+        // Update conversation list with last message
+        dispatch(updateConversationLastMessage({
+            userId: receiverId,
+            lastMessage: messageText
+        }));
+
+        try {
+            const res = await axios.post(
+                `https://snapgrid-r8kd.onrender.com/api/v1/message/send/${receiverId}`,
+                { textMessage: messageText },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    withCredentials: true
+                }
+            );
+
+            if (res.data.success) {
+                // Temporary message will be replaced by real message via socket
+                // The real message with proper _id will come via socket
+            } else {
+                // Remove temporary message if send failed
+                dispatch(removeTempMessage(tempId));
+                setTextMessage(messageText); // Restore text if failed
+            }
+        } catch (error) {
+            console.log('Error sending message:', error);
+            // Remove temporary message if send failed
+            dispatch(removeTempMessage(tempId));
+            setTextMessage(messageText); // Restore text if failed
         }
     }
 
@@ -41,31 +155,10 @@ const ChatPage = () => {
         }
     }
 
-    useEffect(() => {
-        // If a user is already selected (e.g., from Profile page), keep it
-        // Only clear on unmount if navigating away from chat
-        return () => {
-            // Don't clear selectedUser here to allow navigation from Profile
-        }
-    },[]);
-
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Combine suggestedUsers with selectedUser if it's not in the list
-    const allUsers = useMemo(() => {
-        const usersMap = new Map();
-        suggestedUsers.forEach(user => {
-            usersMap.set(user._id.toString(), user);
-        });
-        // Add selectedUser if it exists and is not in suggestedUsers
-        if (selectedUser && !usersMap.has(selectedUser._id?.toString())) {
-            return [selectedUser, ...suggestedUsers];
-        }
-        return suggestedUsers;
-    }, [suggestedUsers, selectedUser]);
-
-    const filteredUsers = allUsers.filter(user => 
-        user.username.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredConversations = (conversations || []).filter(conv => 
+        conv.user?.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
@@ -86,14 +179,14 @@ const ChatPage = () => {
                     </div>
                 </div>
                 <div className='overflow-y-auto flex-1'>
-                    {filteredUsers.length > 0 ? (
-                        filteredUsers.map((suggestedUser) => {
-                            const isOnline = onlineUsers.includes(suggestedUser?._id);
-                            const isSelected = selectedUser?._id === suggestedUser?._id;
+                    {filteredConversations.length > 0 ? (
+                        filteredConversations.map((conv) => {
+                            const isOnline = onlineUsers.includes(conv.user?._id);
+                            const isSelected = selectedUser?._id === conv.user?._id;
                             return (
                                 <div 
-                                    key={suggestedUser._id}
-                                    onClick={() => dispatch(setSelectedUser(suggestedUser))} 
+                                    key={conv._id}
+                                    onClick={() => dispatch(setSelectedUser(conv.user))} 
                                     className={`flex gap-3 items-center p-3 sm:p-4 cursor-pointer transition-colors ${
                                         isSelected 
                                             ? 'bg-blue-50 border-l-4 border-l-[#0095F6]' 
@@ -102,17 +195,17 @@ const ChatPage = () => {
                                 >
                                     <div className='relative'>
                                         <Avatar className='w-10 h-10 sm:w-12 sm:h-12 border-2 border-white'>
-                                            <AvatarImage src={suggestedUser?.profilePicture} />
-                                            <AvatarFallback>{suggestedUser?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                                            <AvatarImage src={conv.user?.profilePicture} />
+                                            <AvatarFallback>{conv.user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                                         </Avatar>
                                         {isOnline && (
                                             <div className='absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 border-2 border-white rounded-full'></div>
                                         )}
                                     </div>
                                     <div className='flex flex-col flex-1 min-w-0'>
-                                        <span className='font-semibold text-sm truncate'>{suggestedUser?.username}</span>
-                                        <span className={`text-xs ${isOnline ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
-                                            {isOnline ? 'Active now' : 'Offline'}
+                                        <span className='font-semibold text-sm truncate'>{conv.user?.username}</span>
+                                        <span className={`text-xs truncate ${isOnline ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                            {isOnline ? 'Active now' : (conv.lastMessage || 'No messages yet')}
                                         </span>
                                     </div>
                                 </div>
@@ -120,7 +213,7 @@ const ChatPage = () => {
                         })
                     ) : (
                         <div className='text-center py-8 text-gray-400 text-sm'>
-                            <p>No users found</p>
+                            <p>No conversations yet</p>
                         </div>
                     )}
                 </div>
@@ -149,6 +242,46 @@ const ChatPage = () => {
                                     {onlineUsers.includes(selectedUser?._id) ? 'Active now' : 'Offline'}
                                 </span>
                             </div>
+                            {/* 3-dot Menu */}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <button className='p-2 hover:bg-gray-100 rounded-full transition-colors'>
+                                        <MoreVertical className='w-5 h-5 text-gray-600' />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className='w-48'>
+                                    <div className='flex flex-col gap-2'>
+                                        <button
+                                            onClick={() => {
+                                                setConfirmDialog({
+                                                    isOpen: true,
+                                                    title: 'Clear Chat',
+                                                    message: `Are you sure you want to clear all messages with ${selectedUser?.username}? This action cannot be undone.`,
+                                                    action: clearChatHandler,
+                                                    actionType: 'clearChat'
+                                                });
+                                            }}
+                                            className='text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors'
+                                        >
+                                            Clear chat
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setConfirmDialog({
+                                                    isOpen: true,
+                                                    title: 'Delete User',
+                                                    message: `Are you sure you want to remove ${selectedUser?.username} from your conversations?`,
+                                                    action: deleteUserHandler,
+                                                    actionType: 'deleteUser'
+                                                });
+                                            }}
+                                            className='text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors'
+                                        >
+                                            Delete user
+                                        </button>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
 
                         {/* Messages */}
@@ -183,6 +316,40 @@ const ChatPage = () => {
                     </div>
                 )
             }
+
+            {/* Confirmation Dialog */}
+            <Dialog open={confirmDialog.isOpen} onOpenChange={(isOpen) => setConfirmDialog(prev => ({...prev, isOpen}))}>
+                <DialogContent className='animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] duration-300'>
+                    <DialogHeader>
+                        <DialogTitle className='text-xl font-bold text-gray-900'>{confirmDialog.title}</DialogTitle>
+                        <DialogDescription className='text-gray-600 mt-2'>
+                            {confirmDialog.message}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className='flex gap-3 mt-6'>
+                        <Button
+                            variant='outline'
+                            onClick={() => setConfirmDialog(prev => ({...prev, isOpen: false}))}
+                            className='px-6 hover:bg-gray-100 transition-colors'
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                confirmDialog.action?.();
+                                setConfirmDialog(prev => ({...prev, isOpen: false}));
+                            }}
+                            className={`px-6 text-white transition-all transform hover:scale-105 active:scale-95 ${
+                                confirmDialog.actionType === 'clearChat'
+                                    ? 'bg-red-600 hover:bg-red-700'
+                                    : 'bg-orange-600 hover:bg-orange-700'
+                            }`}
+                        >
+                            Confirm
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

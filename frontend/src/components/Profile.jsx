@@ -5,10 +5,12 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { AtSign, Heart, MessageCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import axios from 'axios';
 import { setUserProfile, setAuthUser, setSelectedUser } from '@/redux/authSlice';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
+import Post from './Post';
+import ProfilePostGrid from './ProfilePostGrid';
 
 const Profile = () => {
   const params = useParams();
@@ -49,9 +51,10 @@ const Profile = () => {
         }
       }
     } catch (error) {
-      console.error('Follow/Unfollow error:', error);
+      console.log('Follow/Unfollow error:', error);
     }
   }
+
 
   const displayedPost = activeTab === 'posts' ? userProfile?.posts : userProfile?.bookmarks;
 
@@ -62,10 +65,15 @@ const Profile = () => {
         <div className='flex flex-col sm:grid sm:grid-cols-3 gap-6 sm:gap-8'>
           {/* Avatar Section */}
           <section className='flex items-center justify-center sm:col-span-1'>
-            <Avatar className='h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36 border-4 border-gray-100 shadow-lg'>
-              <AvatarImage src={userProfile?.profilePicture} alt="profilephoto" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
+            <div 
+              onClick={() => userProfile?.profilePicture && setSelectedImage(userProfile.profilePicture)}
+              className='cursor-pointer hover:opacity-80 transition-opacity'
+            >
+              <Avatar className='h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36 border-4 border-gray-100 shadow-lg'>
+                <AvatarImage src={userProfile?.profilePicture} alt="profilephoto" />
+                <AvatarFallback>{userProfile?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+              </Avatar>
+            </div>
           </section>
           {/* Info Section */}
           <section className='sm:col-span-2'>
@@ -152,34 +160,12 @@ const Profile = () => {
             <span className='py-3 cursor-pointer text-gray-500 border-b-2 border-transparent hover:text-black transition-colors hidden sm:block'>REELS</span>
             <span className='py-3 cursor-pointer text-gray-500 border-b-2 border-transparent hover:text-black transition-colors hidden sm:block'>TAGS</span>
           </div>
-          <div className='grid grid-cols-3 gap-0.5 sm:gap-1 mt-4'>
+          <div className='space-y-6 mt-6'>
             {
               displayedPost?.length > 0 ? (
-                displayedPost.map((post) => {
-                  return (
-                    <div 
-                      key={post?._id} 
-                      className='relative group cursor-pointer overflow-hidden rounded-sm'
-                      onClick={() => setSelectedImage(post.image)}
-                    >
-                      <img src={post.image} alt='postimage' className='w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105' />
-                      <div className='absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300'>
-                        <div className='flex items-center text-white space-x-3 sm:space-x-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
-                          <div className='flex items-center gap-1 sm:gap-2'>
-                            <Heart className='w-4 h-4 sm:w-5 sm:h-5' />
-                            <span className='font-semibold text-xs sm:text-sm'>{post?.likes?.length || 0}</span>
-                          </div>
-                          <div className='flex items-center gap-1 sm:gap-2'>
-                            <MessageCircle className='w-4 h-4 sm:w-5 sm:h-5' />
-                            <span className='font-semibold text-xs sm:text-sm'>{post?.comments?.length || 0}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
+                <ProfilePostGrid posts={displayedPost} />
               ) : (
-                <div className='col-span-3 text-center py-12 text-gray-400'>
+                <div className='text-center py-12 text-gray-400'>
                   <p>No {activeTab === 'posts' ? 'posts' : 'saved posts'} yet</p>
                 </div>
               )
@@ -189,23 +175,28 @@ const Profile = () => {
 
         {/* Image Lightbox Dialog */}
         <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-[85vw] max-h-[95vh] p-0 bg-transparent border-none overflow-hidden">
+          <DialogContent 
+            onInteractOutside={() => setSelectedImage(null)}
+            onEscapeKeyDown={() => setSelectedImage(null)}
+            className="max-w-fit max-h-fit p-0 bg-transparent border-none overflow-visible flex items-center justify-center"
+          >
             <DialogTitle className="sr-only">View Image</DialogTitle>
-            <div className='relative flex items-center justify-center w-full h-full'>
+            <div className='relative flex items-center justify-center'>
               <button 
                 onClick={() => setSelectedImage(null)}
-                className='absolute top-2 right-2 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors'
+                className='absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors'
               >
                 <X className='w-6 h-6' />
               </button>
               <img
                 src={selectedImage}
-                alt="post_img_full"
-                className='max-w-full max-h-[90vh] object-contain rounded-lg'
+                alt="profile_image_full"
+                className='w-80 h-80 sm:w-96 sm:h-96 rounded-full object-cover'
               />
             </div>
           </DialogContent>
         </Dialog>
+
       </div>
     </div>
   )

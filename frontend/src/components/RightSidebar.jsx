@@ -12,7 +12,7 @@ const RightSidebar = () => {
         <Link to={`/profile/${user?._id}`} className='flex-shrink-0'>
           <Avatar className='w-14 h-14 border-2 border-gray-100'>
             <AvatarImage src={user?.profilePicture} alt="post_image" />
-            <AvatarFallback>CN</AvatarFallback>
+            <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
         </Link>
         <div className='flex-1 min-w-0'>

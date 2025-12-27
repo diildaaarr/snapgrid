@@ -21,6 +21,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(urlencoded({ extended: true }));
 const corsOptions = {
+    //origin:["http://localhost:8000","http://localhost:5173"],
     origin: "https://snapgrid-r8kd.onrender.com",
     credentials: true
 }
@@ -35,6 +36,7 @@ app.use(express.static(path.join(__dirname, "/frontend/dist")));
 app.get("*", (req,res)=>{
     res.sendFile(path.resolve(__dirname, "frontend", "dist", "index.html"));
 })
+
 
 
 server.listen(PORT, () => {

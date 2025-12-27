@@ -9,16 +9,23 @@ const useGetAllMessage = () => {
     const {selectedUser} = useSelector(store=>store.auth);
     useEffect(() => {
         const fetchAllMessage = async () => {
+            if (!selectedUser?._id) {
+                dispatch(setMessages([]));
+                return;
+            }
+
             try {
-                const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/message/all/${selectedUser?._id}`, { withCredentials: true });
-                if (res.data.success) {  
-                    dispatch(setMessages(res.data.messages));
+                const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/message/all/${selectedUser._id}`, { withCredentials: true });
+                if (res.data.success) {
+                    dispatch(setMessages(res.data.messages || []));
                 }
             } catch (error) {
                 console.log(error);
+                // Ensure messages is always an array even on error
+                dispatch(setMessages([]));
             }
         }
         fetchAllMessage();
-    }, [selectedUser]);
+    }, [selectedUser, dispatch]);
 };
 export default useGetAllMessage;

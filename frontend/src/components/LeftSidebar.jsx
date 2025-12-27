@@ -59,7 +59,7 @@
 //             icon: (
 //                 <Avatar className='w-6 h-6'>
 //                     <AvatarImage src={user?.profilePicture} alt="@shadcn" />
-//                     <AvatarFallback>CN</AvatarFallback>
+//                     <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
 //                 </Avatar>
 //             ),
 //             text: "Profile"
@@ -92,7 +92,7 @@
 //                                                                         <div key={notification.userId} className='flex items-center gap-2 my-2'>
 //                                                                             <Avatar>
 //                                                                                 <AvatarImage src={notification.userDetails?.profilePicture} />
-//                                                                                 <AvatarFallback>CN</AvatarFallback>
+//                                                                                 <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
 //                                                                             </Avatar>
 //                                                                             <p className='text-sm'><span className='font-bold'>{notification.userDetails?.username}</span> liked your post</p>
 //                                                                         </div>
@@ -194,7 +194,7 @@ const LeftSidebar = () => {
             icon: (
                 <Avatar className='w-6 h-6'>
                     <AvatarImage src={user?.profilePicture} alt="@shadcn" />
-                    <AvatarFallback>CN</AvatarFallback>
+                    <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
             ),
             text: "Profile"
@@ -212,7 +212,7 @@ const LeftSidebar = () => {
             icon: (
                 <Avatar className='w-6 h-6'>
                     <AvatarImage src={user?.profilePicture} alt="@shadcn" />
-                    <AvatarFallback>CN</AvatarFallback>
+                    <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
             ),
             text: "Profile"
@@ -261,7 +261,7 @@ const LeftSidebar = () => {
                                                                             <div key={notification.userId} className='flex items-center gap-2 my-2'>
                                                                                 <Avatar>
                                                                                     <AvatarImage src={notification.userDetails?.profilePicture} />
-                                                                                    <AvatarFallback>CN</AvatarFallback>
+                                                                                    <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                                                                                 </Avatar>
                                                                                 <p className='text-sm'><span className='font-bold'>{notification.userDetails?.username}</span> liked your post</p>
                                                                             </div>
