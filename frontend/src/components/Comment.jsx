@@ -7,20 +7,17 @@ const Comment = ({ comment }) => {
         if (!dateString) return '';
         try {
             const date = new Date(dateString);
-            const now = new Date();
-            const diffInHours = (now - date) / (1000 * 60 * 60);
-            
-            const hours = date.getHours().toString().padStart(2, '0');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = months[date.getMonth()];
+            const day = date.getDate();
+            const year = date.getFullYear();
+            const hours = date.getHours();
             const minutes = date.getMinutes().toString().padStart(2, '0');
-            
-            if (diffInHours < 24) {
-                return `${hours}:${minutes}`;
-            } else {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                const month = months[date.getMonth()];
-                const day = date.getDate();
-                return `${month} ${day}, ${hours}:${minutes}`;
-            }
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12; // Convert to 12-hour format
+
+            // Always show full date and time
+            return `${month} ${day}, ${year} at ${displayHours}:${minutes} ${ampm}`;
         } catch (error) {
             return '';
         }
@@ -48,11 +45,9 @@ const Comment = ({ comment }) => {
                         <span className='text-sm text-gray-800 break-words'>{comment?.text}</span>
                     </div>
                 </div>
-                {comment?.createdAt && (
-                    <p className='text-xs text-gray-400 mt-1 ml-0'>
-                        {formatTime(comment.createdAt)}
-                    </p>
-                )}
+                <p className='text-xs text-gray-400 mt-1 ml-0'>
+                    {formatTime(comment?.createdAt)}
+                </p>
             </div>
         </div>
     )

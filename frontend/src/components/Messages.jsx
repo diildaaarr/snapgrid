@@ -6,17 +6,20 @@ import { useSelector } from 'react-redux'
 import useGetAllMessage from '@/hooks/useGetAllMessage'
 import useGetRTM from '@/hooks/useGetRTM'
 
-const Messages = ({ selectedUser }) => {
+const Messages = ({ selectedUser, isKeyboardOpen = false }) => {
     useGetAllMessage();
     const {messages = []} = useSelector(store=>store.chat);
     const {user} = useSelector(store=>store.auth);
     const messagesEndRef = useRef(null);
 
     // Filter messages to only show messages between current user and selected user
-    const filteredMessages = messages.filter(msg => 
+    const filteredMessages = messages.filter(msg =>
         (msg.senderId === user?._id && msg.receiverId === selectedUser?._id) ||
         (msg.senderId === selectedUser?._id && msg.receiverId === user?._id)
     );
+
+    // Sort by time (oldest first) - create a copy to avoid mutating read-only arrays
+    const sortedMessages = [...filteredMessages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -24,7 +27,7 @@ const Messages = ({ selectedUser }) => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [filteredMessages]);
+    }, [sortedMessages]);
 
     const formatTime = (dateString) => {
         if (!dateString) return '';
@@ -50,8 +53,8 @@ const Messages = ({ selectedUser }) => {
     };
 
     return (
-        <div className='overflow-y-auto flex-1 p-4 bg-gray-50'>
-            {filteredMessages && Array.isArray(filteredMessages) && filteredMessages.length === 0 && (
+        <div className={`overflow-y-auto bg-gray-50 ${isKeyboardOpen ? 'p-4 pb-24 pt-20 max-h-[calc(100vh-8rem)]' : 'flex-1 p-4'}`}>
+            {sortedMessages && Array.isArray(sortedMessages) && sortedMessages.length === 0 && (
                 <div className='flex justify-center items-center h-full'>
                     <div className='flex flex-col items-center justify-center text-center p-8'>
                         <Avatar className="h-24 w-24 mb-4 border-4 border-white shadow-lg">
@@ -70,10 +73,10 @@ const Messages = ({ selectedUser }) => {
             )}
             <div className='flex flex-col gap-3 max-w-4xl mx-auto'>
                 {
-                   (filteredMessages && Array.isArray(filteredMessages) && filteredMessages.length > 0) && filteredMessages.map((msg, index) => {
+                   (sortedMessages && Array.isArray(sortedMessages) && sortedMessages.length > 0) && sortedMessages.map((msg, index) => {
                         const isOwnMessage = msg.senderId === user?._id;
                         const showAvatar = !isOwnMessage;
-                        const prevMessage = index > 0 ? filteredMessages[index - 1] : null;
+                        const prevMessage = index > 0 ? sortedMessages[index - 1] : null;
                         const showTime = !prevMessage ||
                             new Date(msg.createdAt) - new Date(prevMessage.createdAt) > 5 * 60 * 1000; // 5 minutes
                         

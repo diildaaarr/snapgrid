@@ -41,6 +41,8 @@ const ChatPage = () => {
         action: null,
         actionType: '' // 'clearChat' or 'deleteUser'
     });
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+    const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
     const { user, selectedUser } = useSelector(store => store.auth);
     const { onlineUsers, messages, conversations } = useSelector(store => store.chat);
     const dispatch = useDispatch();
@@ -48,6 +50,61 @@ const ChatPage = () => {
     useGetConversations();
     useGetRTM();
     useGetAllMessage(); // This fetches messages when selectedUser changes
+
+    // Handle mobile keyboard detection and viewport adjustments
+    useEffect(() => {
+        const handleResize = () => {
+            const currentHeight = window.innerHeight;
+            const heightDifference = viewportHeight - currentHeight;
+
+            // Detect keyboard open (significant height reduction on mobile)
+            if (heightDifference > 150 && window.innerWidth < 768) {
+                setIsKeyboardOpen(true);
+                // Adjust viewport height for keyboard
+                document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+            } else {
+                setIsKeyboardOpen(false);
+                document.documentElement.style.setProperty('--vh', '1vh');
+            }
+
+            setViewportHeight(currentHeight);
+        };
+
+        const handleFocus = () => {
+            // Small delay to ensure keyboard is fully open
+            setTimeout(() => {
+                if (window.innerWidth < 768) {
+                    setIsKeyboardOpen(true);
+                    const currentHeight = window.innerHeight;
+                    document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+                }
+            }, 300);
+        };
+
+        const handleBlur = () => {
+            setIsKeyboardOpen(false);
+            document.documentElement.style.setProperty('--vh', '1vh');
+        };
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+
+        // Listen for input focus/blur events
+        const inputs = document.querySelectorAll('input, textarea');
+        inputs.forEach(input => {
+            input.addEventListener('focus', handleFocus);
+            input.addEventListener('blur', handleBlur);
+        });
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+            inputs.forEach(input => {
+                input.removeEventListener('focus', handleFocus);
+                input.removeEventListener('blur', handleBlur);
+            });
+        };
+    }, [viewportHeight]);
 
     const deleteUserHandler = async () => {
         if (!selectedUser) return;
@@ -162,7 +219,7 @@ const ChatPage = () => {
     );
 
     return (
-        <div className='flex h-screen bg-white'>
+        <div className={`flex bg-white ${isKeyboardOpen ? 'h-[calc(var(--vh,1vh)*100)]' : 'h-screen'} overflow-hidden`}>
             {/* Users List Sidebar - Hidden on mobile when user is selected */}
             <section className={`${selectedUser ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-gray-200 flex-col`}>
                 <div className='p-3 sm:p-4 border-b border-gray-200 bg-white'>
@@ -222,9 +279,9 @@ const ChatPage = () => {
             {/* Chat Area - Takes full width on mobile when user is selected */}
             {
                 selectedUser ? (
-                    <section className={`${selectedUser ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white`}>
+                    <section className={`${selectedUser ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-white ${isKeyboardOpen ? 'h-[calc(var(--vh,1vh)*100)] overflow-hidden' : 'h-full'} relative`}>
                         {/* Chat Header */}
-                        <div className='flex gap-2 sm:gap-3 items-center px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white sticky top-0 z-10 shadow-sm'>
+                        <div className={`flex gap-2 sm:gap-3 items-center px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white sticky top-0 shadow-sm ${isKeyboardOpen ? 'z-30 relative' : 'z-10'}`}>
                             {/* Back button for mobile */}
                             <button 
                                 onClick={() => dispatch(setSelectedUser(null))}
@@ -285,10 +342,10 @@ const ChatPage = () => {
                         </div>
 
                         {/* Messages */}
-                        <Messages selectedUser={selectedUser} />
+                        <Messages selectedUser={selectedUser} isKeyboardOpen={isKeyboardOpen} />
 
                         {/* Message Input */}
-                        <div className='flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-t border-gray-200 bg-white'>
+                        <div className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-t border-gray-200 bg-white ${isKeyboardOpen ? 'absolute bottom-0 left-0 right-0 z-20 pb-safe' : ''}`}>
                             <Input 
                                 value={textMessage} 
                                 onChange={(e) => setTextMessage(e.target.value)}

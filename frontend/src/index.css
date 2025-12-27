@@ -13,9 +13,26 @@
       transform: translateY(0);
     }
   }
-  
+
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
+  }
+
+  /* Mobile keyboard handling */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Prevent zoom on input focus on iOS */
+  @media screen and (max-width: 767px) {
+    input, textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Custom viewport height for keyboard handling */
+  .h-dynamic {
+    height: calc(var(--vh, 1vh) * 100);
   }
 }
   

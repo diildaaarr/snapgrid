@@ -17,11 +17,13 @@ const Post = ({ post }) => {
     const [text, setText] = useState("");
     const [open, setOpen] = useState(false);
     const [imageOpen, setImageOpen] = useState(false);
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+    const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
     const { user } = useSelector(store => store.auth);
     const { posts } = useSelector(store => store.post);
     const [liked, setLiked] = useState((post.likes || []).includes(user?._id) || false);
     const [postLike, setPostLike] = useState((post.likes || []).length);
-    const [comment, setComment] = useState(post.comments || []);
+    const [comment, setComment] = useState([...(post.comments || [])].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
     const [isBookmarked, setIsBookmarked] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -35,6 +37,66 @@ const Post = ({ post }) => {
             setIsBookmarked(bookmarked);
         }
     }, [user?.bookmarks, post?._id]);
+
+    // Handle mobile keyboard detection and viewport adjustments
+    useEffect(() => {
+        const handleResize = () => {
+            const currentHeight = window.innerHeight;
+            const heightDifference = viewportHeight - currentHeight;
+
+            // Detect keyboard open (significant height reduction on mobile)
+            if (heightDifference > 150 && window.innerWidth < 768) {
+                setIsKeyboardOpen(true);
+                document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+            } else {
+                setIsKeyboardOpen(false);
+                document.documentElement.style.setProperty('--vh', '1vh');
+            }
+
+            setViewportHeight(currentHeight);
+        };
+
+        const handleFocus = () => {
+            // Small delay to ensure keyboard is fully open
+            setTimeout(() => {
+                if (window.innerWidth < 768) {
+                    setIsKeyboardOpen(true);
+                    const currentHeight = window.innerHeight;
+                    document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+                }
+            }, 300);
+        };
+
+        const handleBlur = () => {
+            setIsKeyboardOpen(false);
+            document.documentElement.style.setProperty('--vh', '1vh');
+        };
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+
+        // Listen for input focus/blur events within this post
+        const postElement = document.querySelector(`[data-post-id="${post._id}"]`);
+        if (postElement) {
+            const inputs = postElement.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                input.addEventListener('focus', handleFocus);
+                input.addEventListener('blur', handleBlur);
+            });
+
+            return () => {
+                inputs.forEach(input => {
+                    input.removeEventListener('focus', handleFocus);
+                    input.removeEventListener('blur', handleBlur);
+                });
+            };
+        }
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
+    }, [viewportHeight, post._id]);
 
     const changeEventHandler = (e) => {
         const inputText = e.target.value;
@@ -65,25 +127,56 @@ const Post = ({ post }) => {
     }
 
     const commentHandler = async () => {
+        if (!text.trim()) return;
+
+        // Create optimistic comment object
+        const optimisticComment = {
+            _id: `temp-${Date.now()}`, // Temporary ID
+            text: text.trim(),
+            author: user, // Current user
+            createdAt: new Date().toISOString(),
+            isOptimistic: true // Flag to identify optimistic updates
+        };
+
+        // Immediately add comment to UI (optimistic update)
+        const updatedCommentData = [...comment, optimisticComment];
+        // Sort comments by creation time (oldest first, so newest appear at bottom)
+        const sortedComments = [...updatedCommentData].sort((a, b) =>
+          new Date(a.createdAt) - new Date(b.createdAt)
+        );
+        setComment(sortedComments);
+        const currentText = text;
+        setText(""); // Clear input immediately
 
         try {
-            const res = await api.post(`/post/${post._id}/comment`, { text }, {
+            const res = await api.post(`/post/${post._id}/comment`, { text: currentText }, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log(res.data);
-            if (res.data.success) {
-                const updatedCommentData = [...comment, res.data.comment];
-                setComment(updatedCommentData);
 
-                // Don't dispatch setPosts to avoid changing the global order of posts
-                // The posts order should be maintained as received from the backend
-                // Removed toast success message as requested
-                setText("");
+            if (res.data.success) {
+                // Replace optimistic comment with real comment from server
+                const finalCommentData = updatedCommentData.map(comment =>
+                    comment.isOptimistic ? res.data.comment : comment
+                );
+                // Sort comments by creation time (oldest first, so newest appear at bottom)
+                const sortedComments = [...finalCommentData].sort((a, b) =>
+                  new Date(a.createdAt) - new Date(b.createdAt)
+                );
+                setComment(sortedComments);
+            } else {
+                // Remove optimistic comment on failure
+                setComment(comment);
+                setText(currentText); // Restore text
+                toast.error("Failed to post comment");
             }
         } catch (error) {
-            console.log(error);
+            console.error('Comment error:', error);
+            // Remove optimistic comment on error
+            setComment(comment);
+            setText(currentText); // Restore text
+            toast.error("Failed to post comment");
         }
     }
 
@@ -132,7 +225,10 @@ const Post = ({ post }) => {
         }
     }
     return (
-        <div className='w-full border border-gray-200 rounded-xl p-3 sm:p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200'>
+        <div
+            data-post-id={post._id}
+            className={`w-full border border-gray-200 rounded-xl p-3 sm:p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 ${isKeyboardOpen ? 'mb-20' : ''}`}
+        >
             <div className='flex items-center justify-between mb-3'>
                 <div className='flex items-center gap-2'>
                     <Link to={`/profile/${post.author?._id}`} className='flex-shrink-0'>
@@ -321,7 +417,7 @@ const Post = ({ post }) => {
                     dispatch(setPosts(updatedPosts));
                 }}
             />
-            <div className='flex items-center justify-between'>
+            <div className={`flex items-center justify-between ${isKeyboardOpen ? 'fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-3 pb-safe' : ''}`}>
                 <input
                     type="text"
                     placeholder='Add a comment...'

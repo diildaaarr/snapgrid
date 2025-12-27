@@ -21,6 +21,8 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
   const [likeCount, setLikeCount] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const commentsEndRef = useRef(null);
@@ -40,7 +42,11 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
           );
           if (res.data.success && res.data.post) {
             const completePost = res.data.post;
-            setComment(completePost.comments || []);
+            // Sort comments by creation time (oldest first, so newest appear at bottom)
+            const sortedComments = [...(completePost.comments || [])].sort((a, b) =>
+              new Date(a.createdAt) - new Date(b.createdAt)
+            );
+            setComment(sortedComments);
             setLikeCount(completePost.likes?.length || 0);
             setLiked(completePost.likes?.includes(user?._id) || false);
             setIsBookmarked(user?.bookmarks?.some(id => id.toString() === completePost._id.toString()) || false);
@@ -67,17 +73,96 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
     }
   }, [comment, open, selectedPost]);
 
+  // Handle mobile keyboard detection and viewport adjustments
+  useEffect(() => {
+    const handleResize = () => {
+      const currentHeight = window.innerHeight;
+      const heightDifference = viewportHeight - currentHeight;
+
+      // Detect keyboard open (significant height reduction on mobile)
+      if (heightDifference > 150 && window.innerWidth < 768) {
+        setIsKeyboardOpen(true);
+        document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+      } else {
+        setIsKeyboardOpen(false);
+        document.documentElement.style.setProperty('--vh', '1vh');
+      }
+
+      setViewportHeight(currentHeight);
+    };
+
+    const handleFocus = () => {
+      // Small delay to ensure keyboard is fully open
+      setTimeout(() => {
+        if (window.innerWidth < 768) {
+          setIsKeyboardOpen(true);
+          const currentHeight = window.innerHeight;
+          document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+        }
+      }, 300);
+    };
+
+    const handleBlur = () => {
+      setIsKeyboardOpen(false);
+      document.documentElement.style.setProperty('--vh', '1vh');
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
+    // Listen for input focus/blur events within the dialog
+    const dialogElement = document.querySelector('[data-radix-dialog-content]');
+    if (dialogElement) {
+      const inputs = dialogElement.querySelectorAll('input, textarea');
+      inputs.forEach(input => {
+        input.addEventListener('focus', handleFocus);
+        input.addEventListener('blur', handleBlur);
+      });
+
+      return () => {
+        inputs.forEach(input => {
+          input.removeEventListener('focus', handleFocus);
+          input.removeEventListener('blur', handleBlur);
+        });
+      };
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, [viewportHeight]);
+
   const changeEventHandler = (e) => {
     setText(e.target.value);
   }
 
   const sendMessageHandler = async () => {
     if (!text.trim() || !selectedPost) return;
-    
+
+    // Create optimistic comment object
+    const optimisticComment = {
+      _id: `temp-${Date.now()}`, // Temporary ID
+      text: text.trim(),
+      author: user, // Current user
+      createdAt: new Date().toISOString(),
+      isOptimistic: true // Flag to identify optimistic updates
+    };
+
+    // Immediately add comment to UI (optimistic update)
+    const updatedCommentData = [...comment, optimisticComment];
+    // Sort comments by creation time (oldest first, so newest appear at bottom)
+    const sortedComments = [...updatedCommentData].sort((a, b) =>
+      new Date(a.createdAt) - new Date(b.createdAt)
+    );
+    setComment(sortedComments);
+    const currentText = text;
+    setText(""); // Clear input immediately
+
     try {
       const res = await axios.post(
-        `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost?._id}/comment`, 
-        { text }, 
+        `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost?._id}/comment`,
+        { text: currentText },
         {
           headers: {
             'Content-Type': 'application/json'
@@ -87,24 +172,27 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
       );
 
       if (res.data.success) {
-        // Fetch the complete updated post to ensure all comments are synced
-        const postRes = await axios.get(
-          `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost._id}`,
-          { withCredentials: true }
+        // Replace optimistic comment with real comment from server
+        const finalCommentData = updatedCommentData.map(comment =>
+          comment.isOptimistic ? res.data.comment : comment
         );
-        
-        if (postRes.data.success && postRes.data.post) {
-          setComment(postRes.data.post.comments || []);
-        } else {
-          const updatedCommentData = [...comment, res.data.comment];
-          setComment(updatedCommentData);
-        }
-
-        setText("");
+        // Sort comments by creation time (oldest first, so newest appear at bottom)
+        const sortedComments = [...finalCommentData].sort((a, b) =>
+          new Date(a.createdAt) - new Date(b.createdAt)
+        );
+        setComment(sortedComments);
+      } else {
+        // Remove optimistic comment on failure
+        setComment(comment);
+        setText(currentText); // Restore text
+        toast.error("Failed to post comment");
       }
     } catch (error) {
       console.error("Error posting comment:", error);
-      toast.error(error.response?.data?.message || "Failed to post comment");
+      // Remove optimistic comment on error
+      setComment(comment);
+      setText(currentText); // Restore text
+      toast.error("Failed to post comment");
     }
   }
 
@@ -193,9 +281,9 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent 
-        onInteractOutside={() => setOpen(false)} 
-        className="max-w-[95vw] md:max-w-6xl h-[85vh] md:h-[90vh] p-0 flex flex-col overflow-hidden"
+      <DialogContent
+        onInteractOutside={() => setOpen(false)}
+        className={`max-w-[95vw] md:max-w-6xl p-0 flex flex-col overflow-hidden ${isKeyboardOpen ? 'h-[calc(var(--vh,1vh)*90)]' : 'h-[85vh] md:h-[90vh]'}`}
         onEscapeKeyDown={() => setOpen(false)}
       >
         <DialogTitle className="sr-only">Comments</DialogTitle>
@@ -358,7 +446,7 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
             </div>
 
             {/* Comments List */}
-            <div className='flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4'>
+            <div className={`flex-1 overflow-y-auto space-y-3 sm:space-y-4 ${isKeyboardOpen ? 'pb-24 p-3' : 'p-3 sm:p-4'}`}>
               {isLoading ? (
                 <div className='flex items-center justify-center h-full'>
                   <p className='text-gray-500 text-sm'>Loading comments...</p>
@@ -380,7 +468,7 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
             </div>
 
             {/* Comment Input */}
-            <div className='p-3 sm:p-4 border-t border-gray-200 bg-gray-50'>
+            <div className={`border-t border-gray-200 bg-gray-50 ${isKeyboardOpen ? 'absolute bottom-0 left-0 right-0 z-20 p-3 pb-safe' : 'p-3 sm:p-4'}`}>
               <div className='flex items-center gap-2'>
                 <Avatar className='w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0'>
                   <AvatarImage src={user?.profilePicture} />
