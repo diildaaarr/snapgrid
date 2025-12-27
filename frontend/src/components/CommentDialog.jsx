@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from './ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Link, useNavigate } from 'react-router-dom'
@@ -23,10 +23,70 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [replyTo, setReplyTo] = useState(null); // { commentId, text, authorId, authorUsername }
   const commentInputRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const commentsEndRef = useRef(null);
+
+  // CSS for preventing overflow in all comment elements
+  const overflowPreventionStyle = {
+      maxWidth: '100%',
+      overflow: 'hidden',
+      wordBreak: 'break-all',
+      overflowWrap: 'break-word',
+      textOverflow: 'clip'
+  };
+
+  // JavaScript-based overflow prevention - selective to preserve scrolling
+  const preventOverflow = useCallback((element) => {
+      if (!element) return;
+
+      // Skip the main scrollable container to preserve scrolling
+      if (element.classList.contains('overflow-y-auto')) {
+          element.style.overflowY = 'auto';
+          element.style.overflowX = 'hidden';
+          return;
+      }
+
+      // Force the element to respect its container bounds
+      element.style.maxWidth = '100%';
+      element.style.overflowX = 'hidden';
+      element.style.wordBreak = 'break-all';
+      element.style.overflowWrap = 'break-word';
+      element.style.whiteSpace = 'pre-wrap';
+      element.style.textOverflow = 'clip';
+      element.style.boxSizing = 'border-box';
+
+      // Only apply overflow: hidden to text elements, not containers
+      if (element.tagName === 'P' || element.tagName === 'SPAN' || element.tagName === 'DIV') {
+          element.style.overflow = 'hidden';
+      }
+
+      // Force parent containers to constrain width only (preserve their overflow settings)
+      let parent = element.parentElement;
+      let depth = 0;
+      while (parent && depth < 5 && !parent.classList.contains('overflow-y-auto')) {
+          parent.style.maxWidth = '100%';
+          parent.style.overflowX = 'hidden';
+          parent.style.boxSizing = 'border-box';
+          // Don't set overflow: hidden on parent containers to preserve scrolling
+          parent = parent.parentElement;
+          depth++;
+      }
+  }, []);
+
+  // Ref callback for immediate overflow prevention
+  const commentRef = useCallback((node) => {
+      if (node) {
+          // Apply to all text elements in this comment
+          const textElements = node.querySelectorAll('p, span, div');
+          textElements.forEach(preventOverflow);
+
+          // Apply to the comment container itself
+          preventOverflow(node);
+      }
+  }, [preventOverflow]);
 
   // Use post prop if provided, otherwise fallback to Redux selectedPost
   const selectedPost = post || reduxSelectedPost;
@@ -74,69 +134,210 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
     }
   }, [comment, open, selectedPost]);
 
-  // Handle mobile keyboard detection and viewport adjustments
+  // Handle mobile keyboard detection and viewport adjustments - Enhanced version
   useEffect(() => {
+    let keyboardCheckTimeout;
+
+    const updateKeyboardState = (isOpen) => {
+      setIsKeyboardOpen(isOpen);
+      if (isOpen) {
+        const currentHeight = window.innerHeight;
+        document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+      } else {
+        document.documentElement.style.setProperty('--vh', '1vh');
+      }
+    };
+
     const handleResize = () => {
       const currentHeight = window.innerHeight;
       const heightDifference = viewportHeight - currentHeight;
 
+      // Clear any pending keyboard checks
+      if (keyboardCheckTimeout) {
+        clearTimeout(keyboardCheckTimeout);
+      }
+
       // Detect keyboard open (significant height reduction on mobile)
       if (heightDifference > 150 && window.innerWidth < 768) {
-        setIsKeyboardOpen(true);
-        document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
-      } else {
-        setIsKeyboardOpen(false);
-        document.documentElement.style.setProperty('--vh', '1vh');
+        updateKeyboardState(true);
+      } else if (heightDifference < 50) {
+        // Only close keyboard if height difference is minimal (keyboard fully closed)
+        keyboardCheckTimeout = setTimeout(() => {
+          updateKeyboardState(false);
+        }, 200); // Small delay to prevent flickering
       }
 
       setViewportHeight(currentHeight);
     };
 
-    const handleFocus = () => {
-      // Small delay to ensure keyboard is fully open
-      setTimeout(() => {
-        if (window.innerWidth < 768) {
-          setIsKeyboardOpen(true);
-          const currentHeight = window.innerHeight;
-          document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+    const handleFocus = (e) => {
+      // Only handle mobile focus events
+      if (window.innerWidth >= 768) return;
+
+      // Clear any pending keyboard checks
+      if (keyboardCheckTimeout) {
+        clearTimeout(keyboardCheckTimeout);
+      }
+
+      // Immediate keyboard detection for better UX
+      keyboardCheckTimeout = setTimeout(() => {
+        const currentHeight = window.innerHeight;
+        const initialHeight = window.screen.height;
+        const heightRatio = currentHeight / initialHeight;
+
+        // Consider keyboard open if height is significantly reduced
+        if (heightRatio < 0.75) {
+          updateKeyboardState(true);
         }
-      }, 300);
+      }, 150); // Reduced delay for faster detection
     };
 
     const handleBlur = () => {
-      setIsKeyboardOpen(false);
-      document.documentElement.style.setProperty('--vh', '1vh');
+      // Delay keyboard close to prevent flickering when switching between inputs
+      if (keyboardCheckTimeout) {
+        clearTimeout(keyboardCheckTimeout);
+      }
+      keyboardCheckTimeout = setTimeout(() => {
+        updateKeyboardState(false);
+      }, 300);
+    };
+
+    // Use visual viewport API if available for better keyboard detection
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const heightRatio = window.visualViewport.height / window.innerHeight;
+        if (heightRatio < 0.8 && window.innerWidth < 768) {
+          updateKeyboardState(true);
+        } else if (heightRatio > 0.9) {
+          updateKeyboardState(false);
+        }
+      }
     };
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
 
-    // Listen for input focus/blur events within the dialog
+    // Add visual viewport listener if supported
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+    }
+
+    // Listen for input focus/blur events within the dialog - use event delegation for dynamic inputs
     const dialogElement = document.querySelector('[data-radix-dialog-content]');
     if (dialogElement) {
-      const inputs = dialogElement.querySelectorAll('input, textarea');
-      inputs.forEach(input => {
-        input.addEventListener('focus', handleFocus);
-        input.addEventListener('blur', handleBlur);
-      });
+      const handleInputFocus = (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          handleFocus(e);
+        }
+      };
+
+      const handleInputBlur = (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          handleBlur();
+        }
+      };
+
+      dialogElement.addEventListener('focusin', handleInputFocus);
+      dialogElement.addEventListener('focusout', handleInputBlur);
 
       return () => {
-        inputs.forEach(input => {
-          input.removeEventListener('focus', handleFocus);
-          input.removeEventListener('blur', handleBlur);
-        });
+        dialogElement.removeEventListener('focusin', handleInputFocus);
+        dialogElement.removeEventListener('focusout', handleInputBlur);
       };
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+      }
+      if (keyboardCheckTimeout) {
+        clearTimeout(keyboardCheckTimeout);
+      }
     };
   }, [viewportHeight]);
+
+  // Apply overflow prevention to all comment elements
+  useEffect(() => {
+      const commentContainer = document.querySelector('[data-radix-dialog-content]');
+      if (!commentContainer) return;
+
+      const applyOverflowPrevention = () => {
+          // Target specific comment content elements only (avoid main container)
+          const commentBubbles = commentContainer.querySelectorAll('.comment-content');
+          commentBubbles.forEach(bubble => {
+              // Apply to text content within comment bubbles
+              const textElements = bubble.querySelectorAll('p, span');
+              textElements.forEach(preventOverflow);
+
+              // Apply to reply indicators
+              const replyIndicators = bubble.querySelectorAll('.reply-indicator, [class*="border-l-"]');
+              replyIndicators.forEach(preventOverflow);
+          });
+
+          // Apply to input preview area
+          const replyPreview = commentContainer.querySelector('[class*="bg-blue-50"]');
+          if (replyPreview) {
+              const previewTexts = replyPreview.querySelectorAll('p, span');
+              previewTexts.forEach(preventOverflow);
+          }
+      };
+
+      // Apply immediately
+      applyOverflowPrevention();
+
+      // Use MutationObserver to handle dynamic content
+      const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+              if (mutation.type === 'childList' || mutation.type === 'subtree') {
+                  applyOverflowPrevention();
+              }
+          });
+      });
+
+      observer.observe(commentContainer, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['class', 'style']
+      });
+
+      // Also observe window resize to reapply constraints
+      const handleResize = () => applyOverflowPrevention();
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', handleResize);
+
+      return () => {
+          observer.disconnect();
+          window.removeEventListener('resize', handleResize);
+          window.removeEventListener('orientationchange', handleResize);
+      };
+  }, [preventOverflow]);
 
   const changeEventHandler = (e) => {
     setText(e.target.value);
   }
+
+  const handleReply = (comment) => {
+    const replyData = {
+      commentId: comment._id,
+      text: comment.text,
+      authorId: comment.author._id,
+      authorUsername: comment.author.username
+    };
+    setReplyTo(replyData);
+    // Focus input immediately for better UX
+    requestAnimationFrame(() => {
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+    });
+  };
+
+  const cancelReply = () => {
+    setReplyTo(null);
+  };
 
   const sendMessageHandler = async () => {
     if (!text.trim() || !selectedPost) return;
@@ -147,6 +348,8 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
       text: text.trim(),
       author: user, // Current user
       createdAt: new Date().toISOString(),
+      replyTo: replyTo?.commentId || null,
+      replyText: replyTo?.text || null,
       isOptimistic: true // Flag to identify optimistic updates
     };
 
@@ -159,18 +362,23 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
     setComment(sortedComments);
     const currentText = text;
     setText(""); // Clear input immediately
+    setReplyTo(null); // Clear reply state
 
-    // Keep input focused to prevent keyboard from hiding on mobile
-    setTimeout(() => {
+    // Keep input focused immediately to prevent keyboard from hiding on mobile
+    requestAnimationFrame(() => {
         if (commentInputRef.current) {
             commentInputRef.current.focus();
         }
-    }, 100);
+    });
 
     try {
       const res = await axios.post(
         `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost?._id}/comment`,
-        { text: currentText },
+        {
+          text: currentText,
+          replyTo: replyTo?.commentId || null,
+          replyText: replyTo?.text || null
+        },
         {
           headers: {
             'Content-Type': 'application/json'
@@ -194,12 +402,12 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
         setComment(comment);
         setText(currentText); // Restore text
         toast.error("Failed to post comment");
-        // Keep input focused even on error
-        setTimeout(() => {
+        // Keep input focused immediately even on error
+        requestAnimationFrame(() => {
             if (commentInputRef.current) {
                 commentInputRef.current.focus();
             }
-        }, 100);
+        });
       }
     } catch (error) {
       console.error("Error posting comment:", error);
@@ -207,12 +415,12 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
       setComment(comment);
       setText(currentText); // Restore text
       toast.error("Failed to post comment");
-      // Keep input focused even on error
-      setTimeout(() => {
+      // Keep input focused immediately even on error
+      requestAnimationFrame(() => {
           if (commentInputRef.current) {
               commentInputRef.current.focus();
           }
-      }, 100);
+      });
     }
   }
 
@@ -301,11 +509,40 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent
-        onInteractOutside={() => setOpen(false)}
-        className={`max-w-[95vw] md:max-w-6xl p-0 flex flex-col overflow-hidden ${isKeyboardOpen ? 'h-[calc(var(--vh,1vh)*90)]' : 'h-[85vh] md:h-[90vh]'}`}
-        onEscapeKeyDown={() => setOpen(false)}
-      >
+      <>
+        {/* Global overflow prevention styles - selective to avoid breaking scroll */}
+        <style dangerouslySetInnerHTML={{
+            __html: `
+                [data-radix-dialog-content] .comment-content,
+                [data-radix-dialog-content] .comment-content *,
+                [data-radix-dialog-content] .reply-indicator,
+                [data-radix-dialog-content] .reply-indicator * {
+                    max-width: 100% !important;
+                    overflow-x: hidden !important;
+                    word-break: break-all !important;
+                    overflow-wrap: break-word !important;
+                    box-sizing: border-box !important;
+                }
+                [data-radix-dialog-content] .comment-content p,
+                [data-radix-dialog-content] .comment-content span,
+                [data-radix-dialog-content] .reply-indicator p,
+                [data-radix-dialog-content] .reply-indicator span {
+                    text-overflow: clip !important;
+                    white-space: pre-wrap !important;
+                    overflow: hidden !important;
+                }
+                /* Preserve scrolling on main container */
+                [data-radix-dialog-content] .overflow-y-auto {
+                    overflow-y: auto !important;
+                    overflow-x: hidden !important;
+                }
+            `
+        }} />
+        <DialogContent
+          onInteractOutside={() => setOpen(false)}
+          className={`comment-dialog-content max-w-[95vw] md:max-w-6xl p-0 flex flex-col overflow-hidden ${isKeyboardOpen ? 'h-[calc(var(--vh,1vh)*90)]' : 'h-[85vh] md:h-[90vh]'}`}
+          onEscapeKeyDown={() => setOpen(false)}
+        >
         <DialogTitle className="sr-only">Comments</DialogTitle>
         <div className='flex flex-1 min-h-0 flex-col md:flex-row'>
           {/* Image Section */}
@@ -474,7 +711,9 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
               ) : comment.length > 0 ? (
                 <>
                   {comment.map((commentItem) => (
-                    <Comment key={commentItem._id} comment={commentItem} />
+                    <div key={commentItem._id} ref={commentRef}>
+                      <Comment comment={commentItem} onReply={handleReply} />
+                    </div>
                   ))}
                   <div ref={commentsEndRef} />
                 </>
@@ -486,6 +725,45 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
                 </div>
               )}
             </div>
+
+            {/* Reply Preview */}
+            {replyTo && (
+                <div className='border-t border-gray-200 bg-blue-50'>
+                    <div className='flex items-start justify-between p-3 overflow-hidden'>
+                        <div className='flex-1 min-w-0 mr-2'>
+                            <div className='flex items-center gap-2 mb-1'>
+                                <span className='text-sm font-medium text-blue-700 truncate'>Replying to</span>
+                                <span className='text-sm text-blue-600 truncate'>{replyTo.authorUsername}</span>
+                            </div>
+                            <div className='relative'>
+                                <p className='text-sm text-blue-800 break-words'
+                                   style={{
+                                     wordBreak: 'break-all',
+                                     overflowWrap: 'break-word'
+                                   }}
+                                   title={replyTo.text}>
+                                    {replyTo.text}
+                                </p>
+                                {replyTo.text.length > 100 && (
+                                    <span className='text-xs text-blue-500 mt-1 block'>
+                                        {replyTo.text.length} characters
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            onClick={cancelReply}
+                            className='flex-shrink-0 p-1.5 hover:bg-blue-100 rounded-full transition-colors mt-0.5'
+                            title="Cancel reply"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Comment Input */}
             <div className={`border-t border-gray-200 bg-gray-50 ${isKeyboardOpen ? 'absolute bottom-0 left-0 right-0 z-20 p-3 pb-safe' : 'p-3 sm:p-4'}`}>
@@ -523,6 +801,7 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
           </div>
         </div>
       </DialogContent>
+      </>
     </Dialog>
   )
 }

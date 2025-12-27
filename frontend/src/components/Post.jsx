@@ -19,6 +19,7 @@ const Post = ({ post }) => {
     const [imageOpen, setImageOpen] = useState(false);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
     const commentInputRef = useRef(null);
     const { user } = useSelector(store => store.auth);
     const { posts } = useSelector(store => store.post);
@@ -392,10 +393,12 @@ const Post = ({ post }) => {
             </p>
             {
                 comment.length > 0 && (
-                    <span onClick={() => {
+                    <button onClick={() => {
                         dispatch(setSelectedPost(post));
                         setOpen(true);
-                    }} className='cursor-pointer text-sm text-gray-400'>View all {comment.length} comments</span>
+                    }} className='text-sm text-gray-500 hover:text-gray-700 transition-colors font-medium'>
+                        View all {comment.length} {comment.length === 1 ? 'comment' : 'comments'}
+                    </button>
                 )
             }
             <CommentDialog 
@@ -437,20 +440,101 @@ const Post = ({ post }) => {
                     dispatch(setPosts(updatedPosts));
                 }}
             />
-            <div className={`flex items-center justify-between ${isKeyboardOpen ? 'fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-3 pb-safe' : ''}`}>
-                <input
-                    ref={commentInputRef}
-                    type="text"
-                    placeholder='Add a comment...'
-                    value={text}
-                    onChange={changeEventHandler}
-                    className='outline-none text-sm w-full'
-                />
-                {
-                    text && <span onClick={commentHandler} className='text-[#3BADF8] cursor-pointer'>Post</span>
-                }
-
-            </div>
+            {/* Add Comment Section */}
+            {isKeyboardOpen ? (
+                /* Mobile keyboard-aware input positioning */
+                <div
+                    className='fixed left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg transition-all duration-300'
+                    style={{
+                        bottom: 'max(env(keyboard-height, 0px), env(safe-area-inset-bottom, 0px))',
+                        paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+                        transform: 'translateY(0)' // Ensure smooth transition
+                    }}
+                >
+                    {/* Post context indicator */}
+                    <div className='px-3 py-2 bg-gray-50 border-b border-gray-100'>
+                        <div className='flex items-center gap-2'>
+                            <Avatar className='w-5 h-5'>
+                                <AvatarImage src={post.author?.profilePicture} />
+                                <AvatarFallback className='text-xs'>{post.author?.username?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <span className='text-sm text-gray-600 truncate'>
+                                Replying to <span className='font-medium'>{post.author?.username}</span>
+                            </span>
+                        </div>
+                    </div>
+                    {/* Comment input - Ensure minimum height for visibility */}
+                    <div className='p-3' style={{ minHeight: '60px' }}>
+                        <div className='flex items-center gap-3'>
+                            <Avatar className='w-8 h-8 flex-shrink-0'>
+                                <AvatarImage src={user?.profilePicture} />
+                                <AvatarFallback className='text-xs'>{user?.username?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className='flex-1 flex items-center gap-2'>
+                                <input
+                                    ref={commentInputRef}
+                                    type="text"
+                                    placeholder='Add a comment...'
+                                    value={text}
+                                    onChange={changeEventHandler}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && text.trim()) {
+                                            e.preventDefault();
+                                            commentHandler();
+                                        }
+                                    }}
+                                    className='flex-1 outline-none text-sm placeholder-gray-400 bg-transparent'
+                                    style={{ fontSize: '16px' }} // Prevents zoom on iOS
+                                />
+                                {text.trim() && (
+                                    <Button
+                                        onClick={commentHandler}
+                                        size="sm"
+                                        className='text-[#3BADF8] hover:text-blue-600 font-semibold px-0 py-0 h-auto bg-transparent hover:bg-transparent'
+                                    >
+                                        Post
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* Inline comment input */
+                <div className='border-t border-gray-200 mt-3 p-3'>
+                    <div className='flex items-center gap-3'>
+                        <Avatar className='w-8 h-8 flex-shrink-0'>
+                            <AvatarImage src={user?.profilePicture} />
+                            <AvatarFallback className='text-xs'>{user?.username?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className='flex-1 flex items-center gap-2'>
+                            <input
+                                ref={commentInputRef}
+                                type="text"
+                                placeholder='Add a comment...'
+                                value={text}
+                                onChange={changeEventHandler}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && text.trim()) {
+                                        e.preventDefault();
+                                        commentHandler();
+                                    }
+                                }}
+                                className='flex-1 outline-none text-sm placeholder-gray-400 bg-transparent'
+                            />
+                            {text.trim() && (
+                                <Button
+                                    onClick={commentHandler}
+                                    size="sm"
+                                    className='text-[#3BADF8] hover:text-blue-600 font-semibold px-0 py-0 h-auto bg-transparent hover:bg-transparent'
+                                >
+                                    Post
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

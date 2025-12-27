@@ -279,7 +279,7 @@ export const addComment = async (req,res) =>{
         const postId = req.params.id;
         const commentKrneWalaUserKiId = req.id;
 
-        const {text} = req.body;
+        const {text, replyTo, replyText} = req.body;
 
         const post = await Post.findById(postId);
 
@@ -291,7 +291,9 @@ export const addComment = async (req,res) =>{
         const comment = await Comment.create({
             text,
             author:commentKrneWalaUserKiId,
-            post:postId
+            post:postId,
+            replyTo: replyTo || null,
+            replyText: replyText || null
         })
 
         await comment.populate({
@@ -322,7 +324,14 @@ export const getCommentsOfPost = async (req,res) => {
         const postId = req.params.id;
 
         const comments = await Comment.find({post:postId})
-            .populate('author', 'username profilePicture');
+            .populate('author', 'username profilePicture')
+            .populate({
+                path: 'replyTo',
+                populate: {
+                    path: 'author',
+                    select: 'username'
+                }
+            });
 
         if(!comments) return res.status(404).json({
             message:'No comments found for this post', 

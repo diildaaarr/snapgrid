@@ -6,7 +6,7 @@ export const sendMessage = async (req,res) => {
     try {
         const senderId = req.id;
         const receiverId = req.params.id;
-        const {textMessage:message} = req.body;
+        const {textMessage:message, replyTo, replyText} = req.body;
       
         let conversation = await Conversation.findOne({
             participants:{$all:[senderId, receiverId]}
@@ -36,7 +36,9 @@ export const sendMessage = async (req,res) => {
         const newMessage = await Message.create({
             senderId,
             receiverId,
-            message
+            message,
+            replyTo: replyTo || null,
+            replyText: replyText || null
         });
 
         if(newMessage) {
@@ -80,7 +82,11 @@ export const getMessage = async (req,res) => {
             participants:{$all: [senderId, receiverId]}
         }).populate({
             path: 'messages',
-            options: { sort: { createdAt: 1 } }
+            options: { sort: { createdAt: 1 } },
+            populate: {
+                path: 'replyTo',
+                select: 'message senderId createdAt'
+            }
         });
         if(!conversation) return res.status(200).json({success:true, messages:[]});
 

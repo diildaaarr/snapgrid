@@ -34,6 +34,7 @@ import {
 
 const ChatPage = () => {
     const [textMessage, setTextMessage] = useState("");
+    const [replyTo, setReplyTo] = useState(null); // { messageId, text, senderId, senderUsername }
     const [confirmDialog, setConfirmDialog] = useState({
         isOpen: false,
         title: '',
@@ -54,56 +55,120 @@ const ChatPage = () => {
 
     // Handle mobile keyboard detection and viewport adjustments
     useEffect(() => {
+        let keyboardCheckTimeout;
+
+        const updateKeyboardState = (isOpen) => {
+            setIsKeyboardOpen(isOpen);
+            if (isOpen) {
+                const currentHeight = window.innerHeight;
+                document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+                // Only scroll to bottom when actually sending a message, not when just opening keyboard
+            } else {
+                document.documentElement.style.setProperty('--vh', '1vh');
+            }
+        };
+
         const handleResize = () => {
             const currentHeight = window.innerHeight;
             const heightDifference = viewportHeight - currentHeight;
 
+            // Clear any pending keyboard checks
+            if (keyboardCheckTimeout) {
+                clearTimeout(keyboardCheckTimeout);
+            }
+
             // Detect keyboard open (significant height reduction on mobile)
             if (heightDifference > 150 && window.innerWidth < 768) {
-                setIsKeyboardOpen(true);
-                // Adjust viewport height for keyboard
-                document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
-            } else {
-                setIsKeyboardOpen(false);
-                document.documentElement.style.setProperty('--vh', '1vh');
+                updateKeyboardState(true);
+            } else if (heightDifference < 50) {
+                // Only close keyboard if height difference is minimal (keyboard fully closed)
+                keyboardCheckTimeout = setTimeout(() => {
+                    updateKeyboardState(false);
+                }, 200); // Small delay to prevent flickering
             }
 
             setViewportHeight(currentHeight);
         };
 
-        const handleFocus = () => {
-            // Small delay to ensure keyboard is fully open
-            setTimeout(() => {
-                if (window.innerWidth < 768) {
-                    setIsKeyboardOpen(true);
-                    const currentHeight = window.innerHeight;
-                    document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+        const handleFocus = (e) => {
+            // Only handle mobile focus events
+            if (window.innerWidth >= 768) return;
+
+            // Clear any pending keyboard checks
+            if (keyboardCheckTimeout) {
+                clearTimeout(keyboardCheckTimeout);
+            }
+
+            // Immediate keyboard detection for better UX
+            keyboardCheckTimeout = setTimeout(() => {
+                const currentHeight = window.innerHeight;
+                const initialHeight = window.screen.height;
+                const heightRatio = currentHeight / initialHeight;
+
+                // Consider keyboard open if height is significantly reduced
+                if (heightRatio < 0.75) {
+                    updateKeyboardState(true);
                 }
-            }, 300);
+            }, 150); // Reduced delay for faster detection
         };
 
         const handleBlur = () => {
-            setIsKeyboardOpen(false);
-            document.documentElement.style.setProperty('--vh', '1vh');
+            // Delay keyboard close to prevent flickering when switching between inputs
+            if (keyboardCheckTimeout) {
+                clearTimeout(keyboardCheckTimeout);
+            }
+            keyboardCheckTimeout = setTimeout(() => {
+                updateKeyboardState(false);
+            }, 300);
+        };
+
+        // Use visual viewport API if available for better keyboard detection
+        const handleVisualViewportChange = () => {
+            if (window.visualViewport) {
+                const heightRatio = window.visualViewport.height / window.innerHeight;
+                if (heightRatio < 0.8 && window.innerWidth < 768) {
+                    updateKeyboardState(true);
+                } else if (heightRatio > 0.9) {
+                    updateKeyboardState(false);
+                }
+            }
         };
 
         window.addEventListener('resize', handleResize);
         window.addEventListener('orientationchange', handleResize);
 
-        // Listen for input focus/blur events
-        const inputs = document.querySelectorAll('input, textarea');
-        inputs.forEach(input => {
-            input.addEventListener('focus', handleFocus);
-            input.addEventListener('blur', handleBlur);
-        });
+        // Add visual viewport listener if supported
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+        }
+
+        // Listen for input focus/blur events - use event delegation for dynamic inputs
+        const handleInputFocus = (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                handleFocus(e);
+            }
+        };
+
+        const handleInputBlur = (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                handleBlur();
+            }
+        };
+
+        document.addEventListener('focusin', handleInputFocus);
+        document.addEventListener('focusout', handleInputBlur);
 
         return () => {
             window.removeEventListener('resize', handleResize);
             window.removeEventListener('orientationchange', handleResize);
-            inputs.forEach(input => {
-                input.removeEventListener('focus', handleFocus);
-                input.removeEventListener('blur', handleBlur);
-            });
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+            }
+            document.removeEventListener('focusin', handleInputFocus);
+            document.removeEventListener('focusout', handleInputBlur);
+            if (keyboardCheckTimeout) {
+                clearTimeout(keyboardCheckTimeout);
+            }
         };
     }, [viewportHeight]);
 
@@ -152,6 +217,26 @@ const ChatPage = () => {
         }
     };
 
+    const handleReply = (message) => {
+        const replyData = {
+            messageId: message._id,
+            text: message.message,
+            senderId: message.senderId,
+            senderUsername: message.senderId === user._id ? 'You' : selectedUser?.username || 'Unknown'
+        };
+        setReplyTo(replyData);
+        // Focus input immediately for better UX
+        requestAnimationFrame(() => {
+            if (messageInputRef.current) {
+                messageInputRef.current.focus();
+            }
+        });
+    };
+
+    const cancelReply = () => {
+        setReplyTo(null);
+    };
+
     const sendMessageHandler = async (receiverId) => {
         if (!textMessage.trim() || !receiverId) return;
 
@@ -171,13 +256,23 @@ const ChatPage = () => {
         // Immediately add message to UI
         dispatch(addMessage(tempMessage));
         setTextMessage("");
+        setReplyTo(null); // Clear reply state
 
-        // Keep input focused to prevent keyboard from hiding on mobile
+        // Scroll to bottom to show the new message
         setTimeout(() => {
+            const messagesContainer = document.querySelector('.overflow-y-auto');
+            if (messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }, 100);
+
+        // Keep input focused immediately to prevent keyboard from hiding on mobile
+        // Use requestAnimationFrame for immediate execution without setTimeout delay
+        requestAnimationFrame(() => {
             if (messageInputRef.current) {
                 messageInputRef.current.focus();
             }
-        }, 100);
+        });
 
         // Update conversation list with last message
         dispatch(updateConversationLastMessage({
@@ -188,7 +283,11 @@ const ChatPage = () => {
         try {
             const res = await axios.post(
                 `https://snapgrid-r8kd.onrender.com/api/v1/message/send/${receiverId}`,
-                { textMessage: messageText },
+                {
+                    textMessage: messageText,
+                    replyTo: replyTo?.messageId || null,
+                    replyText: replyTo?.text || null
+                },
                 {
                     headers: {
                         'Content-Type': 'application/json'
@@ -204,12 +303,12 @@ const ChatPage = () => {
                 // Remove temporary message if send failed
                 dispatch(removeTempMessage(tempId));
                 setTextMessage(messageText); // Restore text if failed
-                // Keep input focused even on error
-                setTimeout(() => {
+                // Keep input focused immediately even on error
+                requestAnimationFrame(() => {
                     if (messageInputRef.current) {
                         messageInputRef.current.focus();
                     }
-                }, 100);
+                });
             }
         } catch (error) {
             console.log('Error sending message:', error);
@@ -362,10 +461,53 @@ const ChatPage = () => {
                         </div>
 
                         {/* Messages */}
-                        <Messages selectedUser={selectedUser} isKeyboardOpen={isKeyboardOpen} />
+                        <Messages
+                            selectedUser={selectedUser}
+                            isKeyboardOpen={isKeyboardOpen}
+                            onReply={handleReply}
+                            replyTo={replyTo}
+                        />
 
                         {/* Message Input */}
-                        <div className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-t border-gray-200 bg-white ${isKeyboardOpen ? 'absolute bottom-0 left-0 right-0 z-20 pb-safe' : ''}`}>
+                        <div className={`flex flex-col border-t border-gray-200 bg-white overflow-hidden ${isKeyboardOpen ? 'absolute bottom-0 left-0 right-0 z-20 pb-safe' : 'relative'}`}>
+                            {/* Reply Preview */}
+                            {replyTo && (
+                                <div className='flex items-start justify-between p-3 bg-blue-50 border-b border-blue-100 overflow-hidden'>
+                                    <div className='flex-1 min-w-0 mr-2'>
+                                        <div className='flex items-center gap-2 mb-1'>
+                                            <span className='text-sm font-medium text-blue-700 truncate'>Replying to</span>
+                                            <span className='text-sm text-blue-600 truncate'>{replyTo.senderUsername}</span>
+                                        </div>
+                                        <div className='relative'>
+                                            <p className='text-sm text-blue-800 break-words'
+                                               style={{
+                                                 wordBreak: 'break-all',
+                                                 overflowWrap: 'break-word'
+                                               }}
+                                               title={replyTo.text}>
+                                                {replyTo.text}
+                                            </p>
+                                            {replyTo.text.length > 100 && (
+                                                <span className='text-xs text-blue-500 mt-1 block'>
+                                                    {replyTo.text.length} characters
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={cancelReply}
+                                        className='flex-shrink-0 p-1.5 hover:bg-blue-100 rounded-full transition-colors mt-0.5'
+                                        title="Cancel reply"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className='flex items-center gap-2 sm:gap-3 p-3 sm:p-4 overflow-hidden'>
                             <Input
                                 ref={messageInputRef}
                                 value={textMessage}
@@ -375,13 +517,14 @@ const ChatPage = () => {
                                 className='flex-1 focus-visible:ring-transparent h-10 sm:h-11 rounded-full border-gray-300 text-sm'
                                 placeholder="Type a message..."
                             />
-                            <Button 
+                            <Button
                                 onClick={() => sendMessageHandler(selectedUser?._id)}
                                 disabled={!textMessage.trim()}
                                 className='bg-[#0095F6] hover:bg-[#3192d2] h-10 w-10 sm:h-11 sm:w-11 rounded-full p-0 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed'
                             >
                                 <Send className='w-4 h-4 sm:w-5 sm:h-5' />
                             </Button>
+                            </div>
                         </div>
                     </section>
                 ) : (
