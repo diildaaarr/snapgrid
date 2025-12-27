@@ -69,7 +69,7 @@ export const login = async (req, res) => {
             });
         };
 
-        const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, { expiresIn: '1d' });
+        const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, { expiresIn: '10d' });
 
         // Fix: Better way to populate posts
         const populatedUser = await User.findById(user._id)
@@ -91,10 +91,10 @@ export const login = async (req, res) => {
             bookmarks: populatedUser.bookmarks || []
         };
 
-        return res.cookie('token', token, { 
-            httpOnly: true, 
-            sameSite: 'strict', 
-            maxAge: 1 * 24 * 60 * 60 * 1000 
+        return res.cookie('token', token, {
+            httpOnly: true,
+            sameSite: 'strict',
+            maxAge: 10 * 24 * 60 * 60 * 1000
         }).json({
             message: `Welcome back ${userResponse.username}`,
             success: true,

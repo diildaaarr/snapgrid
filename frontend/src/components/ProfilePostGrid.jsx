@@ -1,15 +1,18 @@
 import React, { useState, useCallback } from 'react'
-import { Heart, MessageCircle } from 'lucide-react'
+import { Heart, MessageCircle, X } from 'lucide-react'
 import { FaHeart } from 'react-icons/fa'
-import axios from 'axios'
+import api from '@/lib/api'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import CommentDialog from './CommentDialog'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 const ProfilePostGrid = ({ posts = [] }) => {
     const [updatedPosts, setUpdatedPosts] = useState({})
     const [commentDialogOpen, setCommentDialogOpen] = useState(false)
     const [selectedPost, setSelectedPost] = useState(null)
+    const [photoViewerOpen, setPhotoViewerOpen] = useState(false)
+    const [selectedPhoto, setSelectedPhoto] = useState(null)
     const { user } = useSelector(store => store.auth)
     const dispatch = useDispatch()
 
@@ -24,10 +27,7 @@ const ProfilePostGrid = ({ posts = [] }) => {
             const currentPost = getPostData(post)
             const isLiked = (currentPost.likes || []).includes(user?._id)
             const action = isLiked ? 'dislike' : 'like'
-            const res = await axios.get(
-                `https://snapgrid-r8kd.onrender.com/api/v1/post/${post._id}/${action}`,
-                { withCredentials: true }
-            )
+            const res = await api.get(`/post/${post._id}/${action}`)
             
             if (res.data.success) {
                 // Update the local post data with new likes
@@ -56,6 +56,11 @@ const ProfilePostGrid = ({ posts = [] }) => {
         setCommentDialogOpen(true)
     }
 
+    const handlePhotoClick = (post) => {
+        setSelectedPhoto(post)
+        setPhotoViewerOpen(true)
+    }
+
     if (!posts || posts.length === 0) {
         return (
             <div className='text-center py-12 text-gray-400'>
@@ -77,6 +82,7 @@ const ProfilePostGrid = ({ posts = [] }) => {
                     <div
                         key={post._id}
                         className='group relative w-full aspect-square bg-gray-200 rounded-lg overflow-hidden cursor-pointer'
+                        onClick={() => handlePhotoClick(post)}
                     >
                         <img
                             src={post.image}
@@ -126,11 +132,8 @@ const ProfilePostGrid = ({ posts = [] }) => {
                         const isLiked = (currentPost.likes || []).includes(user?._id)
                         const action = isLiked ? 'dislike' : 'like'
                         try {
-                            const res = await axios.get(
-                                `https://snapgrid-r8kd.onrender.com/api/v1/post/${post._id}/${action}`,
-                                { withCredentials: true }
-                            )
-                            
+                            const res = await api.get(`/post/${post._id}/${action}`)
+
                             if (res.data.success) {
                                 // Update the local post data with new likes from server response
                                 const updatedPost = {
@@ -150,6 +153,28 @@ const ProfilePostGrid = ({ posts = [] }) => {
                     }}
                 />
             )}
+
+            {/* Photo Viewer Modal */}
+            <Dialog open={photoViewerOpen} onOpenChange={setPhotoViewerOpen}>
+                <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-[85vw] max-h-[95vh] p-0 bg-transparent border-none overflow-hidden">
+                    <DialogTitle className="sr-only">View Photo</DialogTitle>
+                    <div className='relative flex items-center justify-center w-full h-full'>
+                        <button
+                            onClick={() => setPhotoViewerOpen(false)}
+                            className='absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors'
+                        >
+                            <X className='w-6 h-6' />
+                        </button>
+                        {selectedPhoto && (
+                            <img
+                                src={selectedPhoto.image}
+                                alt="post_img_full"
+                                className='max-w-full max-h-[90vh] object-contain rounded-lg'
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }

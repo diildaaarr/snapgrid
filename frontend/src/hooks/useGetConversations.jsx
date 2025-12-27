@@ -1,17 +1,15 @@
 import { setConversations } from "@/redux/chatSlice";
-import axios from "axios";
+import api from "@/lib/api";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 
 const useGetConversations = () => {
     const dispatch = useDispatch();
-    
+
     useEffect(() => {
         const fetchConversations = async () => {
             try {
-                const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/message/conversations`, {
-                    withCredentials: true
-                });
+                const res = await api.get(`/message/conversations`);
                 if (res.data.success) {
                     // Ensure conversations are sorted by most recent message time
                     const sortedConversations = res.data.conversations.sort((a, b) => {
@@ -25,7 +23,7 @@ const useGetConversations = () => {
                 console.log(error);
             }
         };
-        
+
         fetchConversations();
     }, [dispatch]);
 };

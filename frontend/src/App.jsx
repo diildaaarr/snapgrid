@@ -14,6 +14,7 @@ import { setSocket } from './redux/socketSlice'
 import { setOnlineUsers } from './redux/chatSlice'
 import { setLikeNotification } from './redux/rtnSlice'
 import ProtectedRoutes from './components/ProtectedRoutes'
+import { setStoreDispatch } from './lib/api'
 
 const browserRouter = createBrowserRouter([
   {
@@ -56,6 +57,11 @@ function App() {
   const { user } = useSelector(store => store.auth);
   const socketRef = useRef(null); // Use ref to store socket instance
   const dispatch = useDispatch();
+
+  // Set up API interceptor with dispatch reference
+  useEffect(() => {
+    setStoreDispatch(dispatch);
+  }, [dispatch]);
 
   useEffect(() => {
     if (user) {

@@ -1,5 +1,5 @@
 import { setSuggestedUsers } from "@/redux/authSlice";
-import axios from "axios";
+import api from "@/lib/api";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 
@@ -10,8 +10,8 @@ const useGetSuggestedUsers = () => {
         const fetchSuggestedUsers = async () => {
             try {
                 // Fetch only 5 users initially
-                const res = await axios.get('https://snapgrid-r8kd.onrender.com/api/v1/user/suggested?limit=5', { withCredentials: true });
-                if (res.data.success) { 
+                const res = await api.get('/user/suggested?limit=5');
+                if (res.data.success) {
                     dispatch(setSuggestedUsers(res.data.users));
                 }
             } catch (error) {

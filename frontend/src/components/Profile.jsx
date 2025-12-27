@@ -1,13 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import useGetUserProfile from '@/hooks/useGetUserProfile';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { X } from 'lucide-react';
+import { X, MoreVertical, LogOut } from 'lucide-react';
 import axios from 'axios';
-import { setUserProfile, setAuthUser, setSelectedUser } from '@/redux/authSlice';
+import { toast } from 'sonner';
+import { setUserProfile, setAuthUser, setSelectedUser, logout } from '@/redux/authSlice';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import Post from './Post';
 import ProfilePostGrid from './ProfilePostGrid';
@@ -20,14 +21,52 @@ const Profile = () => {
   useGetUserProfile(userId);
   const [activeTab, setActiveTab] = useState('posts');
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const menuRef = useRef(null);
 
   const { userProfile, user } = useSelector(store => store.auth);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
 
   const isLoggedInUserProfile = user?._id === userProfile?._id;
   const isFollowing = user?.following?.some(id => id.toString() === userProfile?._id?.toString()) || false;
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+  }
+
+  const handleLogout = async () => {
+    try {
+      const res = await axios.get('https://snapgrid-r8kd.onrender.com/api/v1/user/logout', { withCredentials: true });
+      console.log('Mobile logout response:', res.data);
+      if (res.data.success) {
+        dispatch(logout());
+        navigate('/login');
+        toast.success("Logged out successfully");
+      } else {
+        toast.error("Logout failed: " + (res.data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error('Mobile logout error:', error);
+      console.error('Mobile logout error response:', error.response?.data);
+      toast.error("Logout failed: " + (error.response?.data?.message || error.message));
+    }
   }
 
   const handleFollowUnfollow = async () => {
@@ -62,7 +101,35 @@ const Profile = () => {
     <div className='flex max-w-5xl justify-center mx-auto px-4 sm:px-6 lg:pl-10'>
       <div className='flex flex-col gap-8 sm:gap-12 lg:gap-16 py-6 sm:py-8 w-full'>
         {/* Profile Header */}
-        <div className='flex flex-col sm:grid sm:grid-cols-3 gap-6 sm:gap-8'>
+        <div className='flex flex-col sm:grid sm:grid-cols-3 gap-6 sm:gap-8 relative'>
+          {/* Mobile Menu - Only show for logged-in user's profile */}
+          {isLoggedInUserProfile && (
+            <div ref={menuRef} className='absolute top-0 right-0 sm:hidden'>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className='p-2 rounded-full hover:bg-gray-100 transition-colors'
+                aria-label="Profile menu"
+              >
+                <MoreVertical className='w-6 h-6' />
+              </button>
+
+              {/* Dropdown Menu */}
+              {showMenu && (
+                <div className='absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[150px] z-50'>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowLogoutDialog(true);
+                    }}
+                    className='w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 text-red-600'
+                  >
+                    <LogOut className='w-4 h-4' />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           {/* Avatar Section */}
           <section className='flex items-center justify-center sm:col-span-1'>
             <div 
@@ -175,24 +242,62 @@ const Profile = () => {
 
         {/* Image Lightbox Dialog */}
         <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-          <DialogContent 
+          <DialogContent
             onInteractOutside={() => setSelectedImage(null)}
             onEscapeKeyDown={() => setSelectedImage(null)}
-            className="max-w-fit max-h-fit p-0 bg-transparent border-none overflow-visible flex items-center justify-center"
+            className="max-w-[95vw] sm:max-w-[80vw] max-h-[95vh] p-0 bg-transparent border-none overflow-hidden"
           >
-            <DialogTitle className="sr-only">View Image</DialogTitle>
-            <div className='relative flex items-center justify-center'>
-              <button 
+            <DialogTitle className="sr-only">View Profile Photo</DialogTitle>
+            <div className='relative flex items-center justify-center w-full h-full min-h-[50vh] sm:min-h-[60vh]'>
+              <button
                 onClick={() => setSelectedImage(null)}
-                className='absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors'
+                className='absolute top-2 right-2 sm:top-4 sm:right-4 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors'
+                aria-label="Close profile photo"
               >
-                <X className='w-6 h-6' />
+                <X className='w-5 h-5 sm:w-6 sm:h-6' />
               </button>
-              <img
-                src={selectedImage}
-                alt="profile_image_full"
-                className='w-80 h-80 sm:w-96 sm:h-96 rounded-full object-cover'
-              />
+              <div className='relative max-w-full max-h-full p-4'>
+                <div className='w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 mx-auto rounded-full overflow-hidden border-4 border-white shadow-2xl'>
+                  <img
+                    src={selectedImage}
+                    alt="profile_image_full"
+                    className='w-full h-full object-cover'
+                  />
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Logout Confirmation Dialog */}
+        <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+          <DialogContent className="sm:max-w-md mx-4">
+            <DialogTitle className="text-center text-xl font-semibold mb-4">
+              Confirm Logout
+            </DialogTitle>
+            <div className="text-center mb-6">
+              <p className="text-gray-600 mb-2">Are you sure you want to logout?</p>
+              <div className="flex justify-center mb-4">
+                <LogOut className="w-12 h-12 text-red-500 animate-pulse" />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowLogoutDialog(false)}
+                className="px-6 py-2 hover:bg-gray-50 transition-all duration-200 hover:scale-105"
+              >
+                No
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowLogoutDialog(false);
+                  handleLogout();
+                }}
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
+              >
+                Yes
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

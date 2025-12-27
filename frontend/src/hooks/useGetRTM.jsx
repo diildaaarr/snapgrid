@@ -1,7 +1,7 @@
 import { addMessage, removeTempMessage, updateConversationLastMessage, setConversations } from "@/redux/chatSlice";
 import { useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import axios from "axios";
+import api from "@/lib/api";
 
 const useGetRTM = () => {
     const dispatch = useDispatch();
@@ -30,9 +30,7 @@ const useGetRTM = () => {
     const handleUpdateConversations = useCallback(async () => {
         // Refetch conversations to update the order
         try {
-            const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/message/conversations`, {
-                withCredentials: true
-            });
+            const res = await api.get(`/message/conversations`);
             if (res.data.success) {
                 // Ensure conversations are sorted by most recent message time
                 const sortedConversations = res.data.conversations.sort((a, b) => {

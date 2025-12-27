@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
-import axios from 'axios';
+import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -25,11 +25,10 @@ const Signup = () => {
         e.preventDefault();
         try {
             setLoading(true);
-            const res = await axios.post('https://snapgrid-r8kd.onrender.com/api/v1/user/register', input, {
+            const res = await api.post('/user/register', input, {
                 headers: {
                     'Content-Type': 'application/json'
-                },
-                withCredentials: true
+                }
             });
             if (res.data.success) {
                 navigate("/login");

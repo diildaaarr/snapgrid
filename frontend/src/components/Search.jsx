@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Input } from './ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Link } from 'react-router-dom'
-import axios from 'axios'
+import api from '@/lib/api'
 import { Search as SearchIcon } from 'lucide-react'
 import { useSelector, useDispatch } from 'react-redux'
 import { setAuthUser } from '@/redux/authSlice'
@@ -20,9 +20,7 @@ const Search = () => {
             setLoading(true);
             try {
                 const queryParam = searchQuery.trim() === '' ? '' : `?query=${encodeURIComponent(searchQuery.trim())}`;
-                const res = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/user/search${queryParam}`, {
-                    withCredentials: true
-                });
+                const res = await api.get(`/user/search${queryParam}`);
                 if (res.data.success) {
                     // Sort results by username alphabetically
                     const sortedUsers = res.data.users.sort((a, b) => {
@@ -51,7 +49,7 @@ const Search = () => {
 
     const handleFollow = async (userId) => {
         try {
-            const res = await axios.post(`https://snapgrid-r8kd.onrender.com/api/v1/user/followorunfollow/${userId}`, {}, { withCredentials: true });
+            const res = await api.post(`/user/followorunfollow/${userId}`);
             if (res.data.success) {
                 // Update current user's following array in store
                 if (currentUser) {
@@ -65,9 +63,7 @@ const Search = () => {
                 }
                 // Refresh search results to update follow status
                 const queryParam = searchQuery.trim() === '' ? '' : `?query=${encodeURIComponent(searchQuery.trim())}`;
-                const searchRes = await axios.get(`https://snapgrid-r8kd.onrender.com/api/v1/user/search${queryParam}`, {
-                    withCredentials: true
-                });
+                const searchRes = await api.get(`/user/search${queryParam}`);
                 if (searchRes.data.success) {
                     const sortedUsers = searchRes.data.users.sort((a, b) => {
                         return a.username.localeCompare(b.username);

@@ -1,126 +1,3 @@
-// import { Heart, Home, LogOut, MessageCircle, PlusSquare, Search, TrendingUp } from 'lucide-react'
-// import React, { useState } from 'react'
-// import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-// import { toast } from 'sonner'
-// import axios from 'axios'
-// import { useNavigate } from 'react-router-dom'
-// import { useDispatch, useSelector } from 'react-redux'
-// import { setAuthUser } from '@/redux/authSlice'
-// import CreatePost from './CreatePost'
-// import { setPosts, setSelectedPost } from '@/redux/postSlice'
-// import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-// import { Button } from './ui/button'
-
-// const LeftSidebar = () => {
-//     const navigate = useNavigate();
-//     const { user } = useSelector(store => store.auth);
-//     const { likeNotification } = useSelector(store => store.realTimeNotification);
-//     const dispatch = useDispatch();
-//     const [open, setOpen] = useState(false);
-
-
-//     const logoutHandler = async () => {
-//         try {
-//             const res = await axios.get('https://snapgrid-h6s9.onrender.com/api/v1/user/logout', { withCredentials: true });
-//             if (res.data.success) {
-//                 dispatch(setAuthUser(null));
-//                 dispatch(setSelectedPost(null));
-//                 dispatch(setPosts([]));
-//                 navigate("/login");
-//                 toast.success(res.data.message);
-//             }
-//         } catch (error) {
-//             toast.error(error.response.data.message);
-//         }
-//     }
-
-//     const sidebarHandler = (textType) => {
-//         if (textType === 'Logout') {
-//             logoutHandler();
-//         } else if (textType === "Create") {
-//             setOpen(true);
-//         } else if (textType === "Profile") {
-//             navigate(`/profile/${user?._id}`);
-//         } else if (textType === "Home") {
-//             navigate("/");
-//         } else if (textType === 'Messages') {
-//             navigate("/chat");
-//         }
-//     }
-
-//     const sidebarItems = [
-//         { icon: <Home />, text: "Home" },
-//         { icon: <Search />, text: "Search" },
-//         { icon: <TrendingUp />, text: "Explore" },
-//         { icon: <MessageCircle />, text: "Messages" },
-//         { icon: <Heart />, text: "Notifications" },
-//         { icon: <PlusSquare />, text: "Create" },
-//         {
-//             icon: (
-//                 <Avatar className='w-6 h-6'>
-//                     <AvatarImage src={user?.profilePicture} alt="@shadcn" />
-//                     <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-//                 </Avatar>
-//             ),
-//             text: "Profile"
-//         },
-//         { icon: <LogOut />, text: "Logout" },
-//     ]
-//     return (
-//         <div className='fixed top-0 z-10 left-0 px-4 border-r border-gray-300 w-[16%] h-screen'>
-//             <div className='flex flex-col'>
-//                 <h1 className='my-8 pl-3 font-bold text-xl'>snapgrid</h1>
-//                 <div>
-//                     {
-//                         sidebarItems.map((item, index) => {
-//                             return (
-//                                 <div onClick={() => sidebarHandler(item.text)} key={index} className='flex items-center gap-3 relative hover:bg-gray-100 cursor-pointer rounded-lg p-3 my-3'>
-//                                     {item.icon}
-//                                     <span>{item.text}</span>
-//                                     {
-//                                         item.text === "Notifications" && likeNotification.length > 0 && (
-//                                             <Popover>
-//                                                 <PopoverTrigger asChild>
-//                                                     <Button size='icon' className="rounded-full h-5 w-5 bg-red-600 hover:bg-red-600 absolute bottom-6 left-6">{likeNotification.length}</Button>
-//                                                 </PopoverTrigger>
-//                                                 <PopoverContent>
-//                                                     <div>
-//                                                         {
-//                                                             likeNotification.length === 0 ? (<p>No new notification</p>) : (
-//                                                                 likeNotification.map((notification) => {
-//                                                                     return (
-//                                                                         <div key={notification.userId} className='flex items-center gap-2 my-2'>
-//                                                                             <Avatar>
-//                                                                                 <AvatarImage src={notification.userDetails?.profilePicture} />
-//                                                                                 <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-//                                                                             </Avatar>
-//                                                                             <p className='text-sm'><span className='font-bold'>{notification.userDetails?.username}</span> liked your post</p>
-//                                                                         </div>
-//                                                                     )
-//                                                                 })
-//                                                             )
-//                                                         }
-//                                                     </div>
-//                                                 </PopoverContent>
-//                                             </Popover>
-//                                         )
-//                                     }
-//                                 </div>
-//                             )
-//                         })
-//                     }
-//                 </div>
-//             </div>
-
-//             <CreatePost open={open} setOpen={setOpen} />
-
-//         </div>
-//     )
-// }
-
-// export default LeftSidebar
-
-
 import { Heart, Home, LogOut, MessageCircle, PlusSquare, Search, TrendingUp } from 'lucide-react'
 import React, { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
@@ -133,6 +10,7 @@ import CreatePost from './CreatePost'
 import { setPosts, setSelectedPost } from '@/redux/postSlice'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 
 const LeftSidebar = () => {
     const navigate = useNavigate();
@@ -141,6 +19,7 @@ const LeftSidebar = () => {
     const { likeNotification } = useSelector(store => store.realTimeNotification);
     const dispatch = useDispatch();
     const [open, setOpen] = useState(false);
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
 
     const logoutHandler = async () => {
@@ -160,7 +39,7 @@ const LeftSidebar = () => {
 
     const sidebarHandler = (textType) => {
         if (textType === 'Logout') {
-            logoutHandler();
+            setShowLogoutDialog(true);
         } else if (textType === "Create") {
             setOpen(true);
         } else if (textType === "Profile") {
@@ -304,6 +183,39 @@ const LeftSidebar = () => {
 
             {/* CreatePost Dialog - Outside containers so it works on all screen sizes */}
             <CreatePost open={open} setOpen={setOpen} />
+
+            {/* Logout Confirmation Dialog */}
+            <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                <DialogContent className="sm:max-w-md mx-4">
+                    <DialogTitle className="text-center text-xl font-semibold mb-4">
+                        Confirm Logout
+                    </DialogTitle>
+                    <div className="text-center mb-6">
+                        <p className="text-gray-600 mb-2">Are you sure you want to logout?</p>
+                        <div className="flex justify-center mb-4">
+                            <LogOut className="w-12 h-12 text-red-500 animate-pulse" />
+                        </div>
+                    </div>
+                    <div className="flex gap-3 justify-center">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowLogoutDialog(false)}
+                            className="px-6 py-2 hover:bg-gray-50 transition-all duration-200 hover:scale-105"
+                        >
+                            No
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setShowLogoutDialog(false);
+                                logoutHandler();
+                            }}
+                            className="px-6 py-2 bg-red-600 hover:bg-red-700 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
+                        >
+                            Yes
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }
