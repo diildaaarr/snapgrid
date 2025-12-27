@@ -44,6 +44,8 @@ const ChatPage = () => {
     });
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+    const [keyboardActivated, setKeyboardActivated] = useState(false); // Track if keyboard has been opened
+    const [forceKeyboardOpen, setForceKeyboardOpen] = useState(false); // Force keyboard to stay open
     const messageInputRef = useRef(null);
     const { user, selectedUser } = useSelector(store => store.auth);
     const { onlineUsers, messages, conversations } = useSelector(store => store.chat);
@@ -58,14 +60,18 @@ const ChatPage = () => {
         let keyboardCheckTimeout;
 
         const updateKeyboardState = (isOpen) => {
-            setIsKeyboardOpen(isOpen);
             if (isOpen) {
+                setKeyboardActivated(true); // Mark keyboard as activated once opened
+                setForceKeyboardOpen(true); // Force keyboard to stay open
+                setIsKeyboardOpen(true);
                 const currentHeight = window.innerHeight;
                 document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
-                // Only scroll to bottom when actually sending a message, not when just opening keyboard
-            } else {
+            } else if (!forceKeyboardOpen) {
+                // Only allow keyboard to close if not forcibly kept open
+                setIsKeyboardOpen(false);
                 document.documentElement.style.setProperty('--vh', '1vh');
             }
+            // If forceKeyboardOpen is true, keep keyboard state as true regardless of detection
         };
 
         const handleResize = () => {
@@ -113,13 +119,16 @@ const ChatPage = () => {
         };
 
         const handleBlur = () => {
-            // Delay keyboard close to prevent flickering when switching between inputs
-            if (keyboardCheckTimeout) {
-                clearTimeout(keyboardCheckTimeout);
+            // Don't close keyboard if it has been activated (keep it open for continuous messaging)
+            if (!keyboardActivated) {
+                // Delay keyboard close to prevent flickering when switching between inputs
+                if (keyboardCheckTimeout) {
+                    clearTimeout(keyboardCheckTimeout);
+                }
+                keyboardCheckTimeout = setTimeout(() => {
+                    updateKeyboardState(false);
+                }, 300);
             }
-            keyboardCheckTimeout = setTimeout(() => {
-                updateKeyboardState(false);
-            }, 300);
         };
 
         // Use visual viewport API if available for better keyboard detection
@@ -171,6 +180,48 @@ const ChatPage = () => {
             }
         };
     }, [viewportHeight]);
+
+    // Force input focus when keyboard is activated to prevent keyboard dismissal
+    useEffect(() => {
+        if (keyboardActivated && forceKeyboardOpen) {
+            const maintainFocus = () => {
+                if (messageInputRef.current && document.activeElement !== messageInputRef.current) {
+                    messageInputRef.current.focus();
+                }
+            };
+
+            // Maintain focus continuously while keyboard is forcibly open
+            const focusInterval = setInterval(maintainFocus, 500);
+
+            // Also maintain focus on any interaction
+            const handleInteraction = () => {
+                setTimeout(maintainFocus, 10);
+            };
+
+            document.addEventListener('touchstart', handleInteraction);
+            document.addEventListener('click', handleInteraction);
+
+            // Prevent focus loss on input blur when keyboard is forcibly open
+            const preventBlur = (e) => {
+                if (forceKeyboardOpen && e.target !== messageInputRef.current && messageInputRef.current) {
+                    setTimeout(() => {
+                        if (messageInputRef.current) {
+                            messageInputRef.current.focus();
+                        }
+                    }, 1);
+                }
+            };
+
+            messageInputRef.current?.addEventListener('blur', preventBlur);
+
+            return () => {
+                clearInterval(focusInterval);
+                document.removeEventListener('touchstart', handleInteraction);
+                document.removeEventListener('click', handleInteraction);
+                messageInputRef.current?.removeEventListener('blur', preventBlur);
+            };
+        }
+    }, [keyboardActivated, forceKeyboardOpen]);
 
     const deleteUserHandler = async () => {
         if (!selectedUser) return;
@@ -258,21 +309,45 @@ const ChatPage = () => {
         setTextMessage("");
         setReplyTo(null); // Clear reply state
 
+        // Keep input focused throughout the process to prevent keyboard from hiding on mobile
+        const keepInputFocused = () => {
+            if (messageInputRef.current) {
+                messageInputRef.current.focus();
+                // Force focus with multiple attempts
+                setTimeout(() => {
+                    if (messageInputRef.current) {
+                        messageInputRef.current.focus();
+                        // Additional focus to ensure keyboard stays
+                        setTimeout(() => {
+                            if (messageInputRef.current) {
+                                messageInputRef.current.focus();
+                            }
+                        }, 25);
+                    }
+                }, 10);
+            }
+        };
+
+        // Focus immediately and maintain focus aggressively
+        requestAnimationFrame(keepInputFocused);
+        setTimeout(keepInputFocused, 5);
+        setTimeout(keepInputFocused, 25);
+        setTimeout(keepInputFocused, 50);
+        setTimeout(keepInputFocused, 100);
+
+        // Keep keyboard activated and force it open for continuous messaging
+        setKeyboardActivated(true);
+        setForceKeyboardOpen(true);
+
         // Scroll to bottom to show the new message
         setTimeout(() => {
             const messagesContainer = document.querySelector('.overflow-y-auto');
             if (messagesContainer) {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
-        }, 100);
-
-        // Keep input focused immediately to prevent keyboard from hiding on mobile
-        // Use requestAnimationFrame for immediate execution without setTimeout delay
-        requestAnimationFrame(() => {
-            if (messageInputRef.current) {
-                messageInputRef.current.focus();
-            }
-        });
+            // Ensure input is still focused after scrolling
+            keepInputFocused();
+        }, 150);
 
         // Update conversation list with last message
         dispatch(updateConversationLastMessage({
@@ -516,9 +591,18 @@ const ChatPage = () => {
                                 type="text"
                                 className='flex-1 focus-visible:ring-transparent h-10 sm:h-11 rounded-full border-gray-300 text-sm'
                                 placeholder="Type a message..."
+                                style={{
+                                    WebkitUserSelect: 'text',
+                                    WebkitTouchCallout: 'none',
+                                    WebkitTapHighlightColor: 'transparent'
+                                }}
+                                autoFocus={keyboardActivated} // Keep auto-focus when keyboard is activated
                             />
                             <Button
-                                onClick={() => sendMessageHandler(selectedUser?._id)}
+                                onClick={(e) => {
+                                    e.preventDefault(); // Prevent any default button behavior
+                                    sendMessageHandler(selectedUser?._id);
+                                }}
                                 disabled={!textMessage.trim()}
                                 className='bg-[#0095F6] hover:bg-[#3192d2] h-10 w-10 sm:h-11 sm:w-11 rounded-full p-0 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed'
                             >

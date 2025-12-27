@@ -23,6 +23,8 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [keyboardActivated, setKeyboardActivated] = useState(false); // Track if keyboard has been opened
+  const [forceKeyboardOpen, setForceKeyboardOpen] = useState(false); // Force keyboard to stay open
   const [replyTo, setReplyTo] = useState(null); // { commentId, text, authorId, authorUsername }
   const commentInputRef = useRef(null);
   const dispatch = useDispatch();
@@ -138,15 +140,20 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
   useEffect(() => {
     let keyboardCheckTimeout;
 
-    const updateKeyboardState = (isOpen) => {
-      setIsKeyboardOpen(isOpen);
-      if (isOpen) {
-        const currentHeight = window.innerHeight;
-        document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
-      } else {
-        document.documentElement.style.setProperty('--vh', '1vh');
-      }
-    };
+        const updateKeyboardState = (isOpen) => {
+            if (isOpen) {
+                setKeyboardActivated(true); // Mark keyboard as activated once opened
+                setForceKeyboardOpen(true); // Force keyboard to stay open
+                setIsKeyboardOpen(true);
+                const currentHeight = window.innerHeight;
+                document.documentElement.style.setProperty('--vh', `${currentHeight * 0.01}px`);
+            } else if (!forceKeyboardOpen) {
+                // Only allow keyboard to close if not forcibly kept open
+                setIsKeyboardOpen(false);
+                document.documentElement.style.setProperty('--vh', '1vh');
+            }
+            // If forceKeyboardOpen is true, keep keyboard state as true regardless of detection
+        };
 
     const handleResize = () => {
       const currentHeight = window.innerHeight;
@@ -256,7 +263,49 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
         clearTimeout(keyboardCheckTimeout);
       }
     };
-  }, [viewportHeight]);
+    }, [viewportHeight]);
+
+    // Force input focus when keyboard is activated to prevent keyboard dismissal
+    useEffect(() => {
+        if (keyboardActivated && forceKeyboardOpen) {
+            const maintainFocus = () => {
+                if (commentInputRef.current && document.activeElement !== commentInputRef.current) {
+                    commentInputRef.current.focus();
+                }
+            };
+
+            // Maintain focus continuously while keyboard is forcibly open
+            const focusInterval = setInterval(maintainFocus, 500);
+
+            // Also maintain focus on any interaction
+            const handleInteraction = () => {
+                setTimeout(maintainFocus, 10);
+            };
+
+            document.addEventListener('touchstart', handleInteraction);
+            document.addEventListener('click', handleInteraction);
+
+            // Prevent focus loss on input blur when keyboard is forcibly open
+            const preventBlur = (e) => {
+                if (forceKeyboardOpen && e.target !== commentInputRef.current && commentInputRef.current) {
+                    setTimeout(() => {
+                        if (commentInputRef.current) {
+                            commentInputRef.current.focus();
+                        }
+                    }, 1);
+                }
+            };
+
+            commentInputRef.current?.addEventListener('blur', preventBlur);
+
+            return () => {
+                clearInterval(focusInterval);
+                document.removeEventListener('touchstart', handleInteraction);
+                document.removeEventListener('click', handleInteraction);
+                commentInputRef.current?.removeEventListener('blur', preventBlur);
+            };
+        }
+    }, [keyboardActivated, forceKeyboardOpen]);
 
   // Apply overflow prevention to all comment elements
   useEffect(() => {
@@ -364,12 +413,29 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
     setText(""); // Clear input immediately
     setReplyTo(null); // Clear reply state
 
-    // Keep input focused immediately to prevent keyboard from hiding on mobile
-    requestAnimationFrame(() => {
+    // Keep input focused throughout the process to prevent keyboard from hiding on mobile
+    const keepInputFocused = () => {
         if (commentInputRef.current) {
             commentInputRef.current.focus();
+            // Set a timeout to maintain focus for a longer period
+            setTimeout(() => {
+                if (commentInputRef.current) {
+                    commentInputRef.current.focus();
+                }
+            }, 50);
         }
-    });
+    };
+
+    // Focus immediately and maintain focus aggressively
+    requestAnimationFrame(keepInputFocused);
+    setTimeout(keepInputFocused, 5);
+    setTimeout(keepInputFocused, 25);
+    setTimeout(keepInputFocused, 50);
+    setTimeout(keepInputFocused, 100);
+
+    // Keep keyboard activated and force it open for continuous commenting
+    setKeyboardActivated(true);
+    setForceKeyboardOpen(true);
 
     try {
       const res = await axios.post(
@@ -780,6 +846,12 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
                     onChange={changeEventHandler}
                     placeholder='Add a comment...'
                     className='flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-xs sm:text-sm p-0 h-auto'
+                    style={{
+                        WebkitUserSelect: 'text',
+                        WebkitTouchCallout: 'none',
+                        WebkitTapHighlightColor: 'transparent'
+                    }}
+                    autoFocus={keyboardActivated} // Keep auto-focus when keyboard is activated
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && text.trim() && !e.shiftKey) {
                         e.preventDefault();
@@ -787,9 +859,12 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
                       }
                     }}
                   />
-                  <Button 
-                    disabled={!text.trim()} 
-                    onClick={sendMessageHandler}
+                  <Button
+                    disabled={!text.trim()}
+                    onClick={(e) => {
+                        e.preventDefault(); // Prevent any default button behavior
+                        sendMessageHandler();
+                    }}
                     size="sm"
                     className='rounded-full bg-[#0095F6] hover:bg-[#3192d2] disabled:opacity-50 disabled:cursor-not-allowed h-7 sm:h-8 px-3 sm:px-4'
                   >
