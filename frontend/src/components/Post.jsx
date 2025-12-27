@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from './ui/dialog'
 import { Bookmark, MessageCircle, MoreHorizontal, Send, X } from 'lucide-react'
@@ -19,6 +19,7 @@ const Post = ({ post }) => {
     const [imageOpen, setImageOpen] = useState(false);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+    const commentInputRef = useRef(null);
     const { user } = useSelector(store => store.auth);
     const { posts } = useSelector(store => store.post);
     const [liked, setLiked] = useState((post.likes || []).includes(user?._id) || false);
@@ -148,6 +149,13 @@ const Post = ({ post }) => {
         const currentText = text;
         setText(""); // Clear input immediately
 
+        // Keep input focused to prevent keyboard from hiding on mobile
+        setTimeout(() => {
+            if (commentInputRef.current) {
+                commentInputRef.current.focus();
+            }
+        }, 100);
+
         try {
             const res = await api.post(`/post/${post._id}/comment`, { text: currentText }, {
                 headers: {
@@ -170,6 +178,12 @@ const Post = ({ post }) => {
                 setComment(comment);
                 setText(currentText); // Restore text
                 toast.error("Failed to post comment");
+                // Keep input focused even on error
+                setTimeout(() => {
+                    if (commentInputRef.current) {
+                        commentInputRef.current.focus();
+                    }
+                }, 100);
             }
         } catch (error) {
             console.error('Comment error:', error);
@@ -177,6 +191,12 @@ const Post = ({ post }) => {
             setComment(comment);
             setText(currentText); // Restore text
             toast.error("Failed to post comment");
+            // Keep input focused even on error
+            setTimeout(() => {
+                if (commentInputRef.current) {
+                    commentInputRef.current.focus();
+                }
+            }, 100);
         }
     }
 
@@ -419,6 +439,7 @@ const Post = ({ post }) => {
             />
             <div className={`flex items-center justify-between ${isKeyboardOpen ? 'fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-3 pb-safe' : ''}`}>
                 <input
+                    ref={commentInputRef}
                     type="text"
                     placeholder='Add a comment...'
                     value={text}

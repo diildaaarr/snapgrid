@@ -23,6 +23,7 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const commentInputRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const commentsEndRef = useRef(null);
@@ -159,6 +160,13 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
     const currentText = text;
     setText(""); // Clear input immediately
 
+    // Keep input focused to prevent keyboard from hiding on mobile
+    setTimeout(() => {
+        if (commentInputRef.current) {
+            commentInputRef.current.focus();
+        }
+    }, 100);
+
     try {
       const res = await axios.post(
         `https://snapgrid-r8kd.onrender.com/api/v1/post/${selectedPost?._id}/comment`,
@@ -186,6 +194,12 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
         setComment(comment);
         setText(currentText); // Restore text
         toast.error("Failed to post comment");
+        // Keep input focused even on error
+        setTimeout(() => {
+            if (commentInputRef.current) {
+                commentInputRef.current.focus();
+            }
+        }, 100);
       }
     } catch (error) {
       console.error("Error posting comment:", error);
@@ -193,6 +207,12 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
       setComment(comment);
       setText(currentText); // Restore text
       toast.error("Failed to post comment");
+      // Keep input focused even on error
+      setTimeout(() => {
+          if (commentInputRef.current) {
+              commentInputRef.current.focus();
+          }
+      }, 100);
     }
   }
 
@@ -475,12 +495,13 @@ const CommentDialog = ({ open, setOpen, post, onLikeChange, onLikeHandler }) => 
                   <AvatarFallback className='text-xs'>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className='flex-1 flex items-center gap-2 bg-white border border-gray-300 rounded-full px-3 sm:px-4 py-1.5 sm:py-2'>
-                  <Input 
-                    type="text" 
-                    value={text} 
-                    onChange={changeEventHandler} 
-                    placeholder='Add a comment...' 
-                    className='flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-xs sm:text-sm p-0 h-auto' 
+                  <Input
+                    ref={commentInputRef}
+                    type="text"
+                    value={text}
+                    onChange={changeEventHandler}
+                    placeholder='Add a comment...'
+                    className='flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-xs sm:text-sm p-0 h-auto'
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && text.trim() && !e.shiftKey) {
                         e.preventDefault();

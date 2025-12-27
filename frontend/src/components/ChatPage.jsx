@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { setSelectedUser } from '@/redux/authSlice';
@@ -43,6 +43,7 @@ const ChatPage = () => {
     });
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+    const messageInputRef = useRef(null);
     const { user, selectedUser } = useSelector(store => store.auth);
     const { onlineUsers, messages, conversations } = useSelector(store => store.chat);
     const dispatch = useDispatch();
@@ -171,6 +172,13 @@ const ChatPage = () => {
         dispatch(addMessage(tempMessage));
         setTextMessage("");
 
+        // Keep input focused to prevent keyboard from hiding on mobile
+        setTimeout(() => {
+            if (messageInputRef.current) {
+                messageInputRef.current.focus();
+            }
+        }, 100);
+
         // Update conversation list with last message
         dispatch(updateConversationLastMessage({
             userId: receiverId,
@@ -196,12 +204,24 @@ const ChatPage = () => {
                 // Remove temporary message if send failed
                 dispatch(removeTempMessage(tempId));
                 setTextMessage(messageText); // Restore text if failed
+                // Keep input focused even on error
+                setTimeout(() => {
+                    if (messageInputRef.current) {
+                        messageInputRef.current.focus();
+                    }
+                }, 100);
             }
         } catch (error) {
             console.log('Error sending message:', error);
             // Remove temporary message if send failed
             dispatch(removeTempMessage(tempId));
             setTextMessage(messageText); // Restore text if failed
+            // Keep input focused even on error
+            setTimeout(() => {
+                if (messageInputRef.current) {
+                    messageInputRef.current.focus();
+                }
+            }, 100);
         }
     }
 
@@ -346,13 +366,14 @@ const ChatPage = () => {
 
                         {/* Message Input */}
                         <div className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-t border-gray-200 bg-white ${isKeyboardOpen ? 'absolute bottom-0 left-0 right-0 z-20 pb-safe' : ''}`}>
-                            <Input 
-                                value={textMessage} 
+                            <Input
+                                ref={messageInputRef}
+                                value={textMessage}
                                 onChange={(e) => setTextMessage(e.target.value)}
                                 onKeyPress={(e) => handleKeyPress(e, selectedUser?._id)}
-                                type="text" 
-                                className='flex-1 focus-visible:ring-transparent h-10 sm:h-11 rounded-full border-gray-300 text-sm' 
-                                placeholder="Type a message..." 
+                                type="text"
+                                className='flex-1 focus-visible:ring-transparent h-10 sm:h-11 rounded-full border-gray-300 text-sm'
+                                placeholder="Type a message..."
                             />
                             <Button 
                                 onClick={() => sendMessageHandler(selectedUser?._id)}
